@@ -2,6 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Conteneur partagé avec RunkShareExtension (voir guide.md section 4.2) :
+	     doit correspondre à l'App Group activé sur les deux targets. -->
+	<key>AppGroupId</key>
+	<string>group.com.senluxtech.runk</string>
+	<!-- Schéma privé utilisé par receive_sharing_intent pour rouvrir Runk depuis
+	     RunkShareExtension une fois l'URL écrite dans le conteneur partagé.
+	     Ne pas modifier "ShareMedia-" : préfixe imposé par le package. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

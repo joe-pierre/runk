@@ -108,6 +108,21 @@
 
 ---
 
+## [CHOIX] Tâche 3 — Share Extension iOS : préparation des fichiers sans Xcode + portée de l'extension
+
+**Contexte :** Tâche 3, équivalent iOS du Share Intent Android (Tâche 2). La session s'exécute sur une machine Linux, sans Xcode ni `xcodebuild`/`pod` disponibles.
+**Problème :** la création d'un nouveau target Xcode (`RunkShareExtension`, Share Extension) et l'activation de la capability App Group se font exclusivement dans l'éditeur graphique Xcode — aucune commande ne les remplace, et un `project.pbxproj` reconstruit à la main ne peut pas être vérifié sans Xcode pour le compiler. Une tentative d'édition manuelle du `.pbxproj` aurait pu casser le projet `Runner` existant sans qu'aucune vérification ne soit possible dans cette session.
+**Alternatives envisagées :** (1) éditer `project.pbxproj` directement à la main — écarté après validation explicite avec l'utilisateur, car invérifiable et risqué pour un fichier généré normalement par Xcode ; (2) préparer tout le contenu ne nécessitant pas Xcode (fichiers applicatifs de l'extension, entrées `Info.plist` de `Runner`) et documenter précisément dans `guide.md` (section 4.2) les étapes qui doivent être faites à la main dans Xcode sur une machine macOS — retenue.
+**Décision :** option 2. Fichiers créés dans cette session : `ios/RunkShareExtension/Info.plist`, `ios/RunkShareExtension/ShareViewController.swift` (sous-classe de `RSIShareViewController` du package `receive_sharing_intent`, en suivant son propre exemple officiel), `ios/RunkShareExtension/Base.lproj/MainInterface.storyboard`. `ios/Runner/Info.plist` mis à jour (clé `AppGroupId` + `CFBundleURLTypes` avec le schéma `ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)` requis par le package pour rediriger vers l'app hôte). La création du target Xcode lui-même, l'activation de la capability App Group sur les deux targets, l'ajustement du Podfile et l'ordre des Build Phases restent à faire manuellement dans Xcode — instructions détaillées dans `guide.md` section 4.2.
+**Choix de portée additionnels, documentés pour ne rien trancher silencieusement :**
+- `NSExtensionActivationRule` de l'extension restreint à `NSExtensionActivationSupportsText` + `NSExtensionActivationSupportsWebURLWithMaxCount = 1` uniquement (pas d'image/vidéo/fichier) — symétrique du choix déjà fait pour Android (`mimeType="text/plain"`, voir entrée ci-dessus) et cohérent avec la règle métier 1 de `SPEC.md` (Runk ne stocke jamais de fichier vidéo, uniquement des liens).
+- `AppGroupId` codé en dur (`group.com.senluxtech.runk`) directement dans les deux `Info.plist`, plutôt que via une variable de build `$(CUSTOM_GROUP_ID)` (pattern utilisé dans l'exemple officiel du package) — évite d'avoir à déclarer un réglage "User-Defined" dans Xcode en plus de la capability. Un identifiant d'App Group n'est pas une donnée secrète (à la différence d'une clé Supabase), aucune violation de la règle "aucune clé secrète en dur".
+- `ios/Runner/AppDelegate.swift` non modifié : l'exemple officiel du package y ajoute une surcharge de `application(_:open:options:)`, mais son propre commentaire précise que ce n'est nécessaire que si une **autre** librairie a aussi besoin d'intercepter cet appel. Runk n'en a pas — `registrar.addApplicationDelegate` (déjà appelé par le plugin via `GeneratedPluginRegistrant`) suffit à acheminer l'URL de redirection vers `ShareIntentService`. À revoir si une future dépendance (ex: un SDK d'auth tiers) a besoin du même hook.
+**Leçon :** face à un outillage plateforme totalement absent de l'environnement (ici Xcode/macOS), séparer strictement ce qui peut être fait et vérifié à distance (fichiers texte versionnés) de ce qui ne peut être fait que dans l'outil natif — et documenter ce dernier comme une procédure manuelle précise plutôt que de tenter un contournement invérifiable.
+**Statut :** 🟡 Partiel — fichiers Dart/iOS applicatifs prêts, création du target Xcode et test sur appareil physique restant à faire par l'utilisateur (voir `BUGS_AND_ROADMAP.md`).
+
+---
+
 ## [CHOIX] Offline-first avec Isar + synchronisation last-write-wins vers Supabase
 
 **Contexte :** l'usage attendu (partage rapide de vidéo depuis une autre app) doit fonctionner même sans connexion réseau stable.

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Doit correspondre exactement au groupe activé via la capability "App Groups"
+	     sur les deux targets Runner et RunkShareExtension (voir guide.md section 4.2). -->
+	<key>AppGroupId</key>
+	<string>group.com.senluxtech.runk</string>
+	<key>CFBundleDisplayName</key>
+	<string>Runk</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>NSExtensionActivationRule</key>
+			<dict>
+				<!-- Runk ne sauvegarde jamais de fichier vidéo (SPEC.md règle métier 1),
+				     seulement un lien : l'extension n'accepte donc que du texte et des
+				     URL web, jamais image/vidéo/fichier. Symétrique du choix Android
+				     mimeType="text/plain" (voir DECISIONS.md). -->
+				<key>NSExtensionActivationSupportsText</key>
+				<true/>
+				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<key>NSExtensionMainStoryboard</key>
+		<string>MainInterface</string>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+	</dict>
+</dict>
+</plist>

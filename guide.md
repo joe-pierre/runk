@@ -204,10 +204,27 @@ Vérifie que `android/app/src/main/AndroidManifest.xml` contient les intent-filt
 
 ### 4.2 iOS — Share Extension + App Group
 
-1. Ouvre `ios/Runner.xcworkspace` dans Xcode
-2. Ajoute le target `RunkShareExtension` (`File → New → Target → Share Extension`) si ce n'est pas déjà fait
-3. Active l'**App Group** `group.com.senluxtech.runk` sur **les deux targets** (`Runner` et `RunkShareExtension`) via `Signing & Capabilities → + Capability → App Groups`
-4. Vérifie que le Bundle Identifier de chaque target est unique mais du même préfixe (ex: `com.senluxtech.runk` et `com.senluxtech.runk.ShareExtension`)
+> Cette section ne peut être exécutée que sur macOS avec Xcode (voir section 1) : la création d'un target et l'activation d'une capability se font dans l'éditeur graphique Xcode, aucune commande ne les remplace. Les fichiers applicatifs de l'extension (`ShareViewController.swift`, `Info.plist`, `MainInterface.storyboard`) sont déjà présents dans `ios/RunkShareExtension/` — cette section explique uniquement comment les brancher dans le projet Xcode.
+
+1. **Créer le target** : ouvre `ios/Runner.xcworkspace` (ou `ios/Runner.xcodeproj` si le workspace n'existe pas encore, avant le premier `pod install`) dans Xcode → `File → New → Target… → Share Extension` → nomme-le exactement `RunkShareExtension` → décoche "Activate scheme" si proposé (pas nécessaire pour du développement).
+2. **Aligner la cible de déploiement** : dans `Runner` → `Build Settings` → `iOS Deployment Target`, note la valeur, puis règle la même valeur sur le target `RunkShareExtension`.
+3. **Remplacer les fichiers générés par Xcode** par ceux déjà présents dans `ios/RunkShareExtension/` :
+   - Xcode crée par défaut son propre `Info.plist`, `ShareViewController.swift` (et éventuellement `MainInterface.storyboard` ou un `SwiftUI View` selon la version d'Xcode) dans un dossier `RunkShareExtension/`. Supprime leur contenu généré et remplace-le par le contenu déjà écrit dans `ios/RunkShareExtension/Info.plist`, `ShareViewController.swift` et `Base.lproj/MainInterface.storyboard`.
+   - Si Xcode a généré une interface SwiftUI plutôt qu'un storyboard, supprime ce fichier et ajoute `Base.lproj/MainInterface.storyboard` (déjà fourni) au target `RunkShareExtension`, puis vérifie que le `Info.plist` de l'extension référence bien `NSExtensionMainStoryboard = MainInterface` (déjà le cas dans le fichier fourni).
+   - Assure-toi que chaque fichier a bien pour "Target Membership" **uniquement** `RunkShareExtension`, jamais `Runner`.
+4. **Activer l'App Group sur les deux targets** : pour `Runner` **et** `RunkShareExtension` séparément → `Signing & Capabilities` → `+ Capability` → `App Groups` → ajoute (ou sélectionne s'il existe déjà) `group.com.senluxtech.runk`. Ce doit être exactement la même valeur des deux côtés — c'est elle qui est déjà câblée en dur dans `ios/Runner/Info.plist` (clé `AppGroupId`) et `ios/RunkShareExtension/Info.plist`. Xcode génère automatiquement un fichier `.entitlements` par target à cette étape ; ne pas en créer manuellement.
+5. **Vérifier le Bundle Identifier** du target `RunkShareExtension` : Xcode le préremplit en général en `com.senluxtech.runk.RunkShareExtension` (suffixe du bundle id de `Runner`) — c'est la convention attendue, ne pas le modifier pour qu'il diverge.
+6. **Ordonner les Build Phases de `Runner`** : `Runner` → `Build Phases` → fais glisser `Embed Foundation Extensions` **au-dessus** de `Thin Binary`. Sans cette étape, le build de `Runner` échoue avec `No such module 'receive_sharing_intent'` dans `ShareViewController.swift` (limitation connue du package, voir son README).
+7. **Podfile** : `ios/Podfile` n'existe pas encore dans ce dépôt (jamais générée, aucun build iOS n'a encore eu lieu sur ce projet). Lance une première fois `flutter pub get` puis ouvre le projet dans Xcode (ou `cd ios && pod install`) pour que Flutter génère le `Podfile` par défaut. Ajoute ensuite ce bloc **à l'intérieur** du `target 'Runner' do … end` existant, juste après `flutter_install_all_ios_pods` :
+   ```ruby
+   target 'RunkShareExtension' do
+     inherit! :search_paths
+   end
+   ```
+   Relance `pod install` après cette modification.
+8. **Vérifier le Bundle Identifier** de chaque target : unique par target mais du même préfixe (ex: `com.senluxtech.runk` et `com.senluxtech.runk.RunkShareExtension`).
+
+Ces étapes ne sont réalisables qu'une fois sur macOS ; une fois faites, elles sont conservées dans `project.pbxproj` (versionné) et n'ont pas besoin d'être répétées par les développeurs suivants qui clonent le dépôt.
 
 ---
 
