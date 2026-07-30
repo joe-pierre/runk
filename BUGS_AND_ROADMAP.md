@@ -25,3 +25,4 @@
 - Les schémas de deep link natifs (`instagram://`, `snssdk1233://` pour TikTok, etc.) ne sont pas documentés officiellement par les plateformes et peuvent changer sans préavis — prévoir une vérification périodique (voir `guide.md` section 7.5)
 - Le scraping de balises `og:` pour Instagram/Facebook/Threads est fragile par nature : surveiller le taux de `is_partial = true` en production comme indicateur de santé de chaque provider
 - Politique de conservation des données à clarifier si une fonctionnalité d'export ou de partage entre utilisateurs est ajoutée (RGPD si expansion vers l'UE)
+- **[2026-07-30]** Tâche 2 (`ShareIntentService` Android) : `flutter analyze`/`flutter test`/`flutter build apk --debug` vérifiés en local, mais le critère d'acceptation (partage réel depuis Instagram/TikTok sur appareil physique) n'a pas pu être testé manuellement dans cette session — à valider avant de cocher la ligne correspondante de `TODO.md` Phase 2
