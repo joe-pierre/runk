@@ -11,10 +11,10 @@
 
 ## Phase 2 — Share Intent
 
-- [ ] Configuration Android : intent-filters `SEND` / `SEND_MULTIPLE` dans `AndroidManifest.xml`
+- [x] Configuration Android : intent-filters `SEND` / `SEND_MULTIPLE` dans `AndroidManifest.xml`
 - [ ] Configuration iOS : création du target `RunkShareExtension` + App Group `group.com.senluxtech.runk`
-- [ ] Implémentation de `ShareIntentService` (écoute + récupération du lien initial au démarrage)
-- [ ] Validation d'URL (`_isValidUrl`) avant tout traitement
+- [x] Implémentation de `ShareIntentService` (écoute + récupération du lien initial au démarrage)
+- [x] Validation d'URL (`_isValidUrl`) avant tout traitement
 - [ ] Branchement dans `main.dart` / widget racine : ouverture automatique de la modale d'ajout
 - [ ] Gestion de la file d'attente si plusieurs partages arrivent rapidement (voir `SPEC.md` section 13)
 - [ ] Test manuel sur appareil physique Android ET iOS (voir `guide.md` section 5.3)
