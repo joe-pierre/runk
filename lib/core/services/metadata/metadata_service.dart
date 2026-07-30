@@ -1,8 +1,12 @@
 import 'dart:async';
 
+import 'providers/facebook_provider.dart';
 import 'providers/generic_fallback_provider.dart';
+import 'providers/instagram_provider.dart';
 import 'providers/metadata_provider.dart';
+import 'providers/threads_provider.dart';
 import 'providers/tiktok_provider.dart';
+import 'providers/twitter_provider.dart';
 import 'providers/youtube_provider.dart';
 import 'video_metadata.dart';
 
@@ -17,15 +21,24 @@ import 'video_metadata.dart';
 /// spécifique à une plateforme ne doit vivre ici (voir SPEC.md section 5 —
 /// cette logique vit exclusivement dans chaque `*_provider.dart`).
 class MetadataService {
-  /// Crée le service. [providers] par défaut : YouTube puis TikTok (Tâche 4
-  /// — les autres plateformes seront ajoutées à cette liste en Tâche 7,
-  /// sans autre modification de ce fichier, voir SPEC.md section 8).
-  /// [fallbackProvider] et [timeout] sont injectables pour les tests.
+  /// Crée le service. [providers] par défaut : les 6 plateformes cibles de
+  /// Runk (YouTube et TikTok depuis la Tâche 4, X/Instagram/Facebook/Threads
+  /// ajoutés en Tâche 7 — seule cette liste a été étendue, voir SPEC.md
+  /// section 8). [fallbackProvider] et [timeout] sont injectables pour les
+  /// tests.
   MetadataService({
     List<MetadataProvider>? providers,
     MetadataProvider? fallbackProvider,
     Duration timeout = const Duration(seconds: 5),
-  }) : _providers = providers ?? [YoutubeProvider(), TiktokProvider()],
+  }) : _providers = providers ??
+           [
+             YoutubeProvider(),
+             TiktokProvider(),
+             TwitterProvider(),
+             InstagramProvider(),
+             FacebookProvider(),
+             ThreadsProvider(),
+           ],
        _fallbackProvider = fallbackProvider ?? GenericFallbackProvider(),
        _timeout = timeout;
 
