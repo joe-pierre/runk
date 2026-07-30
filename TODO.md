@@ -42,7 +42,7 @@
 - [ ] `AddBookmarkSheet` (modale d'ajout : thumbnail, titre éditable, tags, bouton sauvegarder)
 - [ ] `HomeScreen` (liste chronologique des bookmarks)
 - [ ] `BookmarkCard` (composant réutilisable d'affichage d'un bookmark)
-- [ ] `BookmarkRepository` + `BookmarkLocalDatasource` (Isar) + `BookmarkRemoteDatasource` (Supabase)
+- [x] `BookmarkRepository` + `BookmarkLocalDatasource` (Isar) + `BookmarkRemoteDatasource` (Supabase)
 - [ ] Flux complet de bout en bout testé : partage → metadata → sauvegarde → affichage dans Home
 
 ## Phase 4.5 — Détection de lien vidéo via clipboard
@@ -66,8 +66,8 @@
 
 - [ ] `TagsScreen` (navigation par tag)
 - [ ] `SearchScreen` (recherche full-text titre + tags)
-- [ ] `SyncService` (synchronisation offline-first Isar ↔ Supabase, gestion `isSynced` / `isDeletedLocally`)
-- [ ] Authentification utilisateur (Supabase Auth — email/password ou magic link)
+- [ ] `SyncService` (synchronisation offline-first Isar ↔ Supabase, gestion `isSynced` / `isDeletedLocally`, exploite `BookmarkRemoteSyncException` pour différencier un vrai échec de sync d'une absence de session — voir DECISIONS.md Tâche 5)
+- [ ] Authentification utilisateur (Supabase Auth — email/password ou magic link) — doit aussi renseigner rétroactivement `BookmarkEntity.userId` sur les bookmarks déjà créés hors ligne (voir DECISIONS.md Tâche 5)
 
 ## Phase 7 — Préparation au déploiement
 

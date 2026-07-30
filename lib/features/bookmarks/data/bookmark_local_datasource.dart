@@ -1,0 +1,85 @@
+import 'package:isar_community/isar.dart';
+
+part 'bookmark_local_datasource.g.dart';
+
+/// Modèle local (Isar) d'un bookmark — miroir de `VideoBookmark` avec des
+/// champs additionnels propres à la persistance et à la synchronisation
+/// offline-first (voir SPEC.md section 3.3).
+@collection
+class BookmarkEntity {
+  /// Identifiant interne Isar (auto-incrémenté), distinct de [remoteId].
+  Id isarId = Isar.autoIncrement;
+
+  /// Correspond à `bookmarks.id` côté Supabase — c'est cet identifiant que
+  /// connaît la couche applicative (`VideoBookmark.id`), jamais [isarId].
+  @Index(unique: true)
+  late String remoteId;
+
+  /// Identifiant de l'utilisateur propriétaire (`bookmarks.user_id` côté
+  /// Supabase), nullable tant qu'aucune authentification n'est en place
+  /// (Phase 6 du TODO) : un bookmark créé hors ligne avant toute connexion
+  /// doit pouvoir être stocké localement sans valeur ici. Rempli
+  /// rétroactivement une fois l'utilisateur authentifié (voir DECISIONS.md,
+  /// entrée "Tâche 5 — user_id absent avant l'authentification").
+  String? userId;
+
+  late String url;
+  String? title;
+  String? thumbnailUrl;
+  late String source;
+  bool isPartial = false;
+  List<String> tags = [];
+  String? note;
+  late DateTime createdAt;
+  late DateTime updatedAt;
+
+  /// `false` = en attente de synchronisation vers Supabase.
+  bool isSynced = false;
+
+  /// Suppression en attente de propagation vers Supabase (voir SPEC.md
+  /// section 13) — vérifié en priorité par le futur `sync_service.dart`
+  /// avant toute suppression distante définitive.
+  bool isDeletedLocally = false;
+}
+
+/// Accès à la collection Isar `BookmarkEntity`.
+///
+/// Responsabilité unique : lecture/écriture brutes dans Isar, aucune
+/// logique de synchronisation ni de mapping vers `VideoBookmark` — celles-ci
+/// vivent exclusivement dans `BookmarkRepository`.
+class BookmarkLocalDatasource {
+  /// Crée le datasource à partir d'une instance [Isar] déjà ouverte
+  /// (injectée pour permettre un Isar de test en mémoire, voir
+  /// `bookmark_repository_test.dart`).
+  BookmarkLocalDatasource(this._isar);
+
+  final Isar _isar;
+
+  /// Insère ou remplace [entity] (upsert par [BookmarkEntity.isarId]).
+  Future<void> upsert(BookmarkEntity entity) {
+    return _isar.writeTxn(() => _isar.bookmarkEntitys.put(entity));
+  }
+
+  /// Retourne l'entité correspondant à [remoteId], ou `null` si absente.
+  Future<BookmarkEntity?> findByRemoteId(String remoteId) {
+    return _isar.bookmarkEntitys.filter().remoteIdEqualTo(remoteId).findFirst();
+  }
+
+  /// Retourne tous les bookmarks non supprimés localement, triés par date de
+  /// création décroissante (voir SPEC.md section 11 — écran Home).
+  Future<List<BookmarkEntity>> getAllActive() {
+    return _isar.bookmarkEntitys
+        .filter()
+        .isDeletedLocallyEqualTo(false)
+        .sortByCreatedAtDesc()
+        .findAll();
+  }
+
+  /// Supprime définitivement l'entité correspondant à [remoteId] de la base
+  /// locale, si elle existe.
+  Future<void> deleteByRemoteId(String remoteId) async {
+    final entity = await findByRemoteId(remoteId);
+    if (entity == null) return;
+    await _isar.writeTxn(() => _isar.bookmarkEntitys.delete(entity.isarId));
+  }
+}
