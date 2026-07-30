@@ -57,12 +57,15 @@
 
 ## Phase 5 — Extension aux plateformes restantes
 
-- [ ] `TwitterProvider` (oEmbed officiel `publish.twitter.com`)
-- [ ] `InstagramProvider` (scraping `og:` tags, avec fallback robuste)
-- [ ] `FacebookProvider` (scraping `og:` tags, `is_partial` fréquent attendu)
-- [ ] `ThreadsProvider` (scraping `og:` tags, `is_partial` fréquent attendu)
-- [ ] `DeepLinkService` : schémas natifs pour chaque plateforme + fallback navigateur systématique
-- [ ] Icônes de plateforme dans `assets/icons/`
+- [x] `TwitterProvider` (oEmbed officiel `publish.twitter.com` — titre basé sur `author_name`, pas de miniature native, voir `DECISIONS.md` Tâche 7)
+- [x] `InstagramProvider` (scraping `og:` tags via `OgTagScraper` partagé, fallback interne vers `isPartial: true`, aucune exception ne remonte)
+- [x] `FacebookProvider` (idem Instagram — `is_partial` fréquent et attendu, pas un bug)
+- [x] `ThreadsProvider` (idem Instagram/Facebook — `is_partial` fréquent et attendu, pas un bug)
+- [x] Providers enregistrés dans `metadata_service.dart` (seule modification apportée à ce fichier) — `source_detector.dart` déjà à jour depuis la Tâche 4, aucune modification nécessaire (voir `DECISIONS.md`)
+- [x] Tests unitaires par provider (mock HTTP) + tests de l'utilitaire partagé `OgTagScraper`
+- [ ] `DeepLinkService` : schémas natifs pour chaque plateforme + fallback navigateur systématique (Tâche 8)
+- [x] Icônes de plateforme ajoutées dans `assets/icons/` (`x.svg`, `instagram.svg`, `facebook.svg`, `threads.svg`) + déclarées dans `pubspec.yaml` — non câblées dans `bookmark_card.dart` (fichier hors périmètre de cette tâche, voir `DECISIONS.md`)
+- [ ] Test manuel sur appareil physique : partager un lien de chacune des 6 plateformes produit un bookmark valide, avec `isPartial` correctement positionné — non réalisable dans cet environnement de développement (pas d'appareil Android/iOS physique ni d'émulateur, même limitation que les tâches précédentes, voir `BUGS_AND_ROADMAP.md`), reste à faire par l'utilisateur
 
 ## Phase 6 — Fonctionnalités secondaires
 

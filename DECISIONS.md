@@ -253,6 +253,56 @@
 
 ---
 
+## [CHOIX] Tâche 7 — `source_detector.dart` déjà complet, aucune modification apportée
+
+**Contexte :** Tâche 7, point 3 ("Mets à jour `source_detector.dart` pour reconnaître les domaines de ces 4 plateformes"). En relisant le fichier avant modification, les domaines `instagram.com`, `facebook.com`/`fb.watch`, `twitter.com`/`x.com` et `threads.net` y sont déjà tous reconnus depuis la Tâche 4 (`source_detector_test.dart` les couvre déjà aussi, test "détecte Instagram, Facebook, X/Twitter et Threads").
+**Décision :** aucune modification de `source_detector.dart` dans cette tâche — documenté ici plutôt que de le modifier inutilement (ce qui aurait été une modification silencieuse d'un fichier par ailleurs listé comme autorisé, mais sans justification réelle) ou de le passer sous silence comme un point de la tâche non traité.
+**Leçon :** avant de modifier un fichier qu'une tâche autorise explicitement à changer, vérifier qu'un changement est réellement nécessaire — un prompt de tâche peut anticiper un travail déjà fait en amont (ici, la Tâche 4 avait couvert les 6 plateformes cibles dès la première implémentation, pas seulement YouTube/TikTok).
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 7 — Fallback interne aux providers de scraping (Instagram/Facebook/Threads), plutôt que délégation systématique au fallback de `MetadataService`
+
+**Contexte :** Tâche 7, point 1, formulation : "scraping des balises `og:title`/`og:image`, timeout court, fallback systématique vers `isPartial: true` en cas d'échec (**aucune exception de scraping ne doit remonter jusqu'à l'UI**)". `MetadataService` (Tâche 4) intercepte déjà toute `Exception` levée par un provider et bascule vers `GenericFallbackProvider` — un simple `throw` (comme `YoutubeProvider`/`TiktokProvider`/`TwitterProvider`) aurait donc déjà satisfait "aucune exception ne remonte à l'UI" de fait.
+**Alternatives envisagées :** (1) laisser `InstagramProvider`/`FacebookProvider`/`ThreadsProvider` lever une exception en cas d'échec de scraping, comme les providers oEmbed, et compter entièrement sur le filet de sécurité de `MetadataService` ; (2) faire en sorte que chacun de ces trois providers **n'expose jamais** d'exception à son appelant — il capture lui-même tout échec (réseau, timeout, balise `og:title` absente) et retourne directement un `VideoMetadata` avec `isPartial: true`.
+**Décision :** option 2. Le scraping HTML est structurellement moins fiable qu'un oEmbed officiel (balises absentes, page de connexion à la place du contenu, structure changeante) — un échec de scraping n'est pas un cas exceptionnel pour ces trois plateformes mais un résultat normal et attendu (Facebook/Threads en particulier, voir contrainte du prompt de tâche). Traiter ce cas comme un retour de fonction ordinaire plutôt qu'une exception rend chaque provider robuste indépendamment du comportement de `MetadataService`, et documente explicitement dans le type de retour ce qui est un cas attendu. `TwitterProvider`, lui, reste sur le pattern strict de la Tâche 4 (lève une exception, `MetadataService` bascule vers le fallback générique) car il s'appuie sur un endpoint oEmbed officiel, structurellement fiable comme YouTube/TikTok.
+**Conséquence :** le titre de repli n'est pas `GenericFallbackProvider.defaultTitle` mais un texte propre à chaque provider (`'Vidéo Instagram sans titre'`, etc.) — les providers ne référencent jamais `GenericFallbackProvider` ni les uns les autres (voir la doc de `metadata_provider.dart`, "aucune référence croisée entre providers").
+**Leçon :** un filet de sécurité générique (ici `MetadataService`) et une gestion d'échec explicite au plus près de sa source ne sont pas mutuellement exclusifs — le second reste préférable quand l'échec est un cas *attendu* du domaine (scraping fragile), pas une anomalie.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 7 — `OgTagScraper`, utilitaire de scraping partagé entre Instagram/Facebook/Threads
+
+**Contexte :** Tâche 7, les trois providers de scraping (Instagram, Facebook, Threads) ont une logique d'extraction de balises `og:title`/`og:image` strictement identique — seule l'URL interrogée diffère. La doc de `metadata_provider.dart` (Tâche 4) précise "aucune référence croisée entre providers", ce qui interdit qu'un provider en importe un autre, mais ne concerne pas un utilitaire de bas niveau partagé.
+**Alternatives envisagées :** (1) dupliquer la logique de requête HTTP + extraction regex dans chacun des trois fichiers `*_provider.dart` — écarté, viole directement CONVENTIONS.md ("un fichier = une responsabilité", éviter la duplication) et rendrait un futur changement de format (ex: passage à un vrai parseur HTML) à faire trois fois ; (2) créer `lib/core/services/metadata/providers/og_tag_scraper.dart`, une classe `OgTagScraper` qui n'implémente pas `MetadataProvider` — comparable à `SourceDetector`, un utilitaire partagé et non une "référence croisée entre providers" au sens interdit par la doc de la Tâche 4.
+**Décision :** option 2. `OgTagScraper.scrape(url)` retourne toujours un `OgTags` (jamais d'exception, voir entrée ci-dessus), avec extraction par regex tolérante à l'ordre des attributs (`property`/`content`) dans la balise `<meta>`, aucune plateforme scrapée ne garantissant un ordre fixe. Chaque provider l'injecte via son propre constructeur (`httpClient` optionnel, comme les autres providers), sans exposer `OgTagScraper` comme point d'injection direct — cohérent avec la convention déjà en place.
+**Leçon :** "aucune référence croisée entre providers" (Tâche 4) visait à éviter qu'une plateforme dépende du comportement d'une autre, pas à interdire un utilitaire de bas niveau factorisé — distinction à faire avant de dupliquer du code par excès de prudence face à une règle mal interprétée.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 7 — `TwitterProvider` : absence de champ titre/miniature natif dans l'oEmbed officiel de X
+
+**Contexte :** Tâche 7, `TwitterProvider` suit "exactement le pattern de la Tâche 4" (oEmbed officiel). Contrairement à YouTube/TikTok, la réponse oEmbed de `publish.twitter.com` ne contient ni champ `title` ni `thumbnail_url` — uniquement `author_name`, `author_url`, `html` (le balisage d'embed complet), `provider_name`, etc. C'est une contrainte du format de réponse officiel de X, pas une erreur de récupération.
+**Alternatives envisagées :** (1) scraper en complément les balises `og:` de la page du post pour obtenir un titre/une image — écarté, mélangerait deux stratégies (oEmbed + scraping) dans un seul provider, contredisant "chaque provider ne connaît que sa propre plateforme" au sens d'une stratégie unique et cohérente, et alourdirait `TwitterProvider` par rapport au pattern demandé ; (2) construire un titre à partir de `author_name` (ex: `"Post de {author_name} sur X"`) et laisser `thumbnailUrl` à `null` en continu, sans que cela ne déclenche `isPartial: true`.
+**Décision :** option 2. `isPartial` reste `false` : le titre a bien été récupéré depuis l'endpoint officiel, l'absence de miniature est une caractéristique connue et permanente de cette réponse (pas un échec ponctuel) — `VideoMetadata.thumbnailUrl` est déjà nullable pour ce type de cas légitime (voir `video_metadata.dart`, Tâche 4).
+**Leçon :** "suivre exactement le pattern d'une tâche précédente" ne garantit pas que la forme de réponse d'une nouvelle API tierce soit identique — vérifier le format réel avant de supposer qu'un champ existe, plutôt que de le caster en aveugle comme si l'API était homogène entre plateformes.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 7 — Icônes de plateforme ajoutées dans `assets/icons/`, jamais câblées dans `bookmark_card.dart`
+
+**Contexte :** Tâche 7, point 4 ("Ajoute les icônes correspondantes dans `assets/icons/`"). Le commentaire doc existant sur `_platformIcon` dans `bookmark_card.dart` (Tâche 6) annonçait explicitement des "icônes de plateforme dédiées prévues en Tâche 7" en remplacement des `Icons.*` Material génériques actuels — ce qui suggérerait de câbler les nouvelles icônes dans ce fichier. Mais la contrainte de la Tâche 7 est explicite : aucune modification des fichiers déjà validés des Tâches 4-6 en dehors de `metadata_service.dart` et `source_detector.dart` ; `bookmark_card.dart` (Tâche 6) n'y figure pas.
+**Alternatives envisagées :** (1) câbler les icônes SVG dans `_platformIcon`/`bookmark_card.dart` comme le commentaire existant le laissait attendre — écarté, violerait directement la contrainte explicite de ce prompt de tâche ; (2) créer les fichiers d'icônes (`assets/icons/x.svg`, `instagram.svg`, `facebook.svg`, `threads.svg`) et déclarer le dossier dans `pubspec.yaml` (`flutter: assets:`), sans toucher à `bookmark_card.dart` — le câblage réel dans l'UI est laissé à une tâche future.
+**Décision :** option 2, tension documentée plutôt que tranchée silencieusement dans un sens ou dans l'autre. `pubspec.yaml` a été modifié (ajout de la section `assets:`) : nécessaire pour que Flutter embarque ces fichiers dans le build, ce n'est pas un fichier "déjà validé Tâches 4-6" au sens de la contrainte (aucune logique métier/scraping/UI n'y est modifiée). Icônes fournies en SVG monochrome (`currentColor`), stylisées et non des reproductions exactes des logos de marque officiels, pour rester descriptives sans risque de propriété intellectuelle.
+**Leçon :** un commentaire `///` qui anticipe une tâche future peut devenir obsolète si le périmètre exact de cette tâche est ensuite restreint explicitement — se fier à la contrainte la plus récente et la plus précise (le prompt de la Tâche 7 lui-même) plutôt qu'à une annotation antérieure.
+**Statut :** 🟡 Partiel — fichiers d'icônes et déclaration `pubspec.yaml` prêts ; câblage dans `bookmark_card.dart` (remplacement des `Icons.*` Material par ces assets) volontairement non fait, à traiter explicitement dans une tâche future (voir `BUGS_AND_ROADMAP.md`).
+
+---
+
 ## [CHOIX] Tâche 6.5 — `detectPatterns` iOS 16+ non implémenté, bannière système acceptée sur toutes les versions d'iOS
 
 **Contexte :** Tâche 6.5, critère de vérification manuel mentionnant `detectPatterns` (iOS 16+) "si le plugin le permet". SPEC.md section 9 recommande cette API native pour éviter la bannière système "Runk a collé depuis…" au retour au premier plan.
