@@ -49,11 +49,11 @@
 
 ## Phase 4.5 — Détection de lien vidéo via clipboard
 
-- [ ] `ClipboardService` (détection au retour au premier plan uniquement, jamais en tâche de fond)
-- [ ] Mémorisation des liens clipboard déjà proposés/ignorés (pour ne jamais les reproposer)
-- [ ] `ClipboardSuggestionBanner` (UI de suggestion non bloquante sur `HomeScreen`)
-- [ ] Vérification de priorité Share Intent > suggestion clipboard en cas de simultanéité (voir `SPEC.md` section 13)
-- [ ] Test manuel iOS 16+ (`detectPatterns`, pas de bannière système) ET iOS < 16 (bannière système native acceptée comme limitation)
+- [x] `ClipboardService` (détection au retour au premier plan uniquement, jamais en tâche de fond)
+- [x] Mémorisation des liens clipboard déjà proposés/ignorés (pour ne jamais les reproposer) — `ClipboardHistoryStore` via `SharedPreferences`
+- [x] `ClipboardSuggestionBanner` (UI de suggestion non bloquante sur `HomeScreen`)
+- [x] Vérification de priorité Share Intent > suggestion clipboard en cas de simultanéité (voir `SPEC.md` section 13) — `shareIntentProcessingProvider`, alimenté par `ShareIntentGate`
+- [ ] Test manuel sur appareil physique iOS 16+ ET iOS < 16 (voir `guide.md` section 5.4) — non réalisable dans cet environnement de développement (pas de matériel iOS), reste à faire par l'utilisateur. `detectPatterns` non implémenté (voir `DECISIONS.md`, entrée "Tâche 6.5") : la bannière système iOS est attendue sur toutes les versions.
 
 ## Phase 5 — Extension aux plateformes restantes
 

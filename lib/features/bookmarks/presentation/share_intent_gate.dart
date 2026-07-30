@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/share_intent_service.dart';
 import '../../../core/services/share_intent_service_provider.dart';
 import 'add_bookmark_sheet.dart';
+import 'share_intent_processing_provider.dart';
 
 /// Connecte `ShareIntentService` à `AddBookmarkSheet` pour tout le reste de
 /// l'application.
@@ -22,6 +23,11 @@ import 'add_bookmark_sheet.dart';
 /// fermeture de la précédente (voir SPEC.md section 13). Ne contient aucune
 /// logique métier propre : délègue entièrement la récupération de
 /// métadonnées et la sauvegarde à `AddBookmarkSheet`.
+///
+/// Publie son état de traitement dans `shareIntentProcessingProvider` (vrai
+/// tant qu'une URL est en attente ou en cours d'affichage), consulté par la
+/// suggestion clipboard pour respecter la priorité Share Intent > clipboard
+/// (SPEC.md section 13, voir DECISIONS.md Tâche 6.5).
 class ShareIntentGate extends ConsumerStatefulWidget {
   /// Crée le gate au-dessus de [child], le contenu applicatif normal.
   const ShareIntentGate({super.key, required this.child});
@@ -68,6 +74,7 @@ class _ShareIntentGateState extends ConsumerState<ShareIntentGate> {
 
   void _enqueueUrl(String url) {
     _pendingUrls.add(url);
+    ref.read(shareIntentProcessingProvider.notifier).set(true);
     unawaited(_processQueue());
   }
 
@@ -85,6 +92,9 @@ class _ShareIntentGateState extends ConsumerState<ShareIntentGate> {
       }
     } finally {
       _isProcessingQueue = false;
+      if (mounted) {
+        ref.read(shareIntentProcessingProvider.notifier).set(false);
+      }
     }
   }
 
