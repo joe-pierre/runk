@@ -123,6 +123,27 @@
 
 ---
 
+## [CHOIX] Tâche 4 — Emplacement de `VideoSource` et forme de `VideoMetadata`
+
+**Contexte :** Tâche 4, création de `source_detector.dart` et de l'interface `MetadataProvider`. Le prompt de tâche mentionne `VideoSource` et `VideoMetadata` sans préciser où les placer ni la forme exacte de `VideoMetadata` — `features/bookmarks/domain/video_bookmark.dart` (SPEC.md section 3.1, qui déclare `enum VideoSource` et le modèle complet `VideoBookmark`) n'existe pas encore (Tâche 5).
+**Symptôme / Problème :** faire vivre `VideoSource` dans `features/bookmarks/domain/` aurait forcé `core/utils/source_detector.dart` et `core/services/metadata/` (Tâche 4) à dépendre de `features/` — inversion de dépendance, `core/` doit rester indépendant des features qui l'utilisent.
+**Cause / Alternatives :** (1) dupliquer un enum équivalent dans `core/` et dans `features/bookmarks/domain/` — écarté, source de désynchronisation ; (2) placer `VideoSource` dans `core/models/video_source.dart`, réutilisé tel quel par le futur `VideoBookmark` (Tâche 5) ; pour `VideoMetadata`, soit fusionner avec le futur `VideoBookmark`, soit une classe dédiée propre à la couche metadata.
+**Fix / Décision :** option 2 pour les deux. `VideoSource` créé dans `lib/core/models/video_source.dart` (Tâche 5 devra l'importer depuis `core/`, ne pas le redéclarer). `VideoMetadata` créé dans `lib/core/services/metadata/video_metadata.dart` comme classe dédiée (`title`, `thumbnailUrl`, `source`, `isPartial`) — volontairement distincte de `VideoBookmark`, qui ajoutera en Tâche 5 les champs propres à la persistance (id, tags, note, dates) absents du résultat brut d'un provider.
+**Leçon :** quand un prompt de tâche référence un type qui appartient formellement à une tâche future, le placer dans la couche la plus basse qui en a besoin maintenant (`core/`), jamais dans la couche qui le consommera plus tard (`features/`) — évite d'avoir à choisir entre dépendance inversée et duplication.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 4 — Mock HTTP des providers via `package:http/testing.dart`
+
+**Contexte :** Tâche 4, tests unitaires de `YoutubeProvider`/`TiktokProvider` nécessitant de simuler des réponses HTTP sans appel réseau réel.
+**Alternatives envisagées :** (1) ajouter une dépendance de mocking dédiée (`mocktail`, `mockito`) ; (2) utiliser `MockClient` de `package:http/testing.dart`, déjà inclus dans le package `http` présent dans `pubspec.yaml` depuis la Tâche 1.
+**Décision :** option 2. Chaque provider accepte un `http.Client` injectable en constructeur (défaut : `http.Client()` réel), ce qui suffit à intercepter les requêtes en test via `MockClient` sans nouvelle dépendance.
+**Leçon :** avant d'ajouter une dépendance de test, vérifier si l'outillage déjà présent (ici `http/testing.dart`, livré avec `http`) couvre déjà le besoin.
+**Statut :** ✅ Résolu
+
+---
+
 ## [CHOIX] Offline-first avec Isar + synchronisation last-write-wins vers Supabase
 
 **Contexte :** l'usage attendu (partage rapide de vidéo depuis une autre app) doit fonctionner même sans connexion réseau stable.
