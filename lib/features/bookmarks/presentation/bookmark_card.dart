@@ -9,8 +9,9 @@ import '../domain/video_bookmark.dart';
 /// Composant réutilisable et purement présentationnel : reçoit un
 /// [VideoBookmark] déjà résolu et ne décide jamais lui-même comment
 /// récupérer une métadonnée (voir CONVENTIONS.md section Partials /
-/// Frontend). [onTap] sera branché sur la réouverture de la vidéo dans son
-/// app source (Tâche 7, `DeepLinkService`) — laissé optionnel ici.
+/// Frontend). [onTap] est branché par `HomeScreen` sur
+/// `DeepLinkService.openInSource` (Tâche 8) — laissé optionnel ici, ce
+/// widget ne connaît lui-même aucune logique de réouverture.
 class BookmarkCard extends StatelessWidget {
   /// Crée la carte pour [bookmark]. [onTap] est appelé au tap sur la carte.
   const BookmarkCard({super.key, required this.bookmark, this.onTap});

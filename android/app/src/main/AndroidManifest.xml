@@ -53,5 +53,32 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Déclaration de visibilité de paquets (Android 11+, voir
+             https://developer.android.com/training/package-visibility) pour
+             les schémas natifs non officiels utilisés par DeepLinkService
+             (lib/core/services/deep_link_service.dart, Tâche 8) : sans ces
+             entrées, PackageManager.canLaunchUrl échoue silencieusement même
+             si l'app cible est installée. Voir BUGS_AND_ROADMAP.md pour le
+             suivi de la fragilité de ces schémas non documentés. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="instagram"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="snssdk1233"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="fb"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="twitter"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="vnd.youtube"/>
+        </intent>
     </queries>
 </manifest>
