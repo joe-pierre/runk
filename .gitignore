@@ -46,3 +46,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Binaire natif isar_community téléchargé par Isar.initializeIsarCore
+# (voir DECISIONS.md, Tâche 5 — "Isar de test via répertoire temporaire")
+/libisar.so

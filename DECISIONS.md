@@ -150,3 +150,42 @@
 **Décision :** toute écriture passe d'abord par Isar (local), puis synchronisation asynchrone vers Supabase quand la connexion est disponible. En cas de conflit d'écriture concurrente entre appareils, la résolution est **last-write-wins** basée sur `updated_at` — pas de fusion intelligente en V1.
 **Leçon :** accepter une limitation connue et documentée (perte potentielle d'une modification concurrente rare) plutôt que de complexifier prématurément avec un système de résolution de conflits avancé non justifié par l'usage réel attendu (utilisateur individuel, rarement multi-appareils simultanés).
 **Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 5 — `user_id` absent avant l'authentification (`BookmarkEntity.userId` nullable)
+
+**Contexte :** Tâche 5, `BookmarkRepository`. Le schéma Supabase (SPEC.md section 3.2) impose `user_id uuid ... not null`, mais l'authentification (Phase 6 du TODO) n'est pas encore implémentée — aucun utilisateur connecté n'existe à ce stade du projet.
+**Alternatives envisagées :** (1) appeler directement `Supabase.instance.client.auth.currentUser` depuis le repository pour remplir `user_id` — écarté, car ça couple le repository à un état d'authentification non testé et casserait le critère d'acceptation ("sans dépendre d'une connexion Supabase réelle") ; (2) ajouter un champ `userId` nullable à `BookmarkEntity` (au-delà du modèle strict de SPEC.md section 3.3, mise à jour en conséquence), rempli rétroactivement par la future Tâche Auth, et ne tenter aucune synchronisation distante tant qu'il est `null`.
+**Décision :** option 2, validée explicitement par l'utilisateur. `BookmarkEntity.userId` est nullable — un bookmark créé hors ligne avant toute authentification est stocké localement sans erreur, `isSynced` reste `false`. `BookmarkRepository._trySyncInsert`/`_trySyncUpdate`/`deleteBookmark` vérifient `entity.userId == null` **avant** tout appel à `BookmarkRemoteDatasource` : si absent, aucune tentative n'est faite (ce n'est pas un échec de synchronisation, juste un état "pas encore prêt à synchroniser").
+**Distinction des erreurs (précision demandée) :** ce garde-fou préalable évite que le cas "pas encore authentifié" ne soit confondu avec un vrai bug de synchronisation. Un échec survenant *après* cette vérification (réseau, rejet RLS malgré un `userId` renseigné, erreur serveur) est enveloppé dans une exception dédiée `BookmarkRemoteSyncException` (`lib/features/bookmarks/data/bookmark_remote_sync_exception.dart`), journalée explicitement via `debugPrint` (pas de `catch` silencieux, voir CONVENTIONS.md section Réponses API) — exploitable plus tard par `sync_service.dart` (Tâche 9) pour différencier les deux cas plutôt que de tout traiter comme un `isSynced = false` indifférencié.
+**Leçon :** quand une dépendance future (ici l'authentification) n'existe pas encore, préférer un garde-fou explicite et déterministe (vérifier un champ local avant d'agir) plutôt que de déclencher un appel voué à l'échec puis d'interpréter son exception — ça évite toute ambiguïté sur la cause réelle d'un `isSynced = false`.
+**Statut :** 🔵 Choix assumé — à revisiter à la Tâche Auth (Phase 6), qui devra fournir un mécanisme pour renseigner `userId` rétroactivement sur les bookmarks déjà créés hors ligne.
+
+---
+
+## [CHOIX] Tâche 5 — Suppression douce (`isDeletedLocally`) avant confirmation distante
+
+**Contexte :** Tâche 5, `BookmarkRepository.deleteBookmark`. SPEC.md section 13 documente un risque : une suppression locale pendant qu'une synchronisation est en cours pourrait faire réapparaître le bookmark supprimé après une sync ultérieure. Le prompt de tâche ne précisait pas si cette mitigation devait être implémentée dès cette tâche ou reportée au futur `sync_service.dart`.
+**Alternatives envisagées :** (1) suppression locale immédiate (comme pour insert/update) + tentative distante best-effort, sans lien avec `isDeletedLocally` — plus simple mais laisse `isDeletedLocally` inutilisé et le risque de réapparition non mitigé ; (2) suppression douce : marquer `isDeletedLocally = true` immédiatement (le bookmark disparaît aussitôt de `getAllBookmarks`), tenter la suppression distante, et ne retirer l'entité locale définitivement qu'une fois cette suppression distante confirmée — sinon la ligne reste marquée en attente pour une synchronisation future.
+**Décision :** option 2, validée explicitement par l'utilisateur — fidèle à SPEC.md section 13. Sans utilisateur authentifié (`userId == null`), aucune tentative distante n'est faite et la ligne reste marquée `isDeletedLocally = true` (nettoyée plus tard par le futur `sync_service.dart`).
+**Leçon :** quand SPEC.md documente déjà une mitigation précise pour un risque identifié, l'implémenter dès que le champ concerné existe plutôt que de la reporter — un champ non exploité (`isDeletedLocally`) aurait fini par diverger silencieusement de son usage prévu.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 5 — Fake du datasource distant sans nouvelle dépendance de mocking
+
+**Contexte :** Tâche 5, test d'intégration CRUD de `BookmarkRepository` nécessitant de simuler `BookmarkRemoteDatasource` sans appel Supabase réel (critère d'acceptation).
+**Décision :** comme pour l'entrée "Tâche 4 — Mock HTTP des providers" ci-dessus, pas de nouvelle dépendance (`mocktail`/`mockito`) : `FakeBookmarkRemoteDatasource implements BookmarkRemoteDatasource` est défini directement dans le fichier de test, Dart permettant nativement d'implémenter l'interface implicite d'une classe concrète.
+**Leçon :** cohérent avec la leçon déjà tirée en Tâche 4 — vérifier que le langage/l'outillage déjà en place suffit avant d'ajouter une dépendance de test.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 5 — Isar de test via répertoire temporaire (pas de mode "en mémoire" natif)
+
+**Contexte :** Tâche 5, critère d'acceptation demandant un "Isar en mémoire de test". `isar_community` ne propose pas de mode purement in-memory : `Isar.open` requiert toujours un `directory`.
+**Décision :** chaque test ouvre une instance Isar dans un répertoire temporaire (`Directory.systemTemp.createTempSync()`), supprimé dans `tearDown` — équivalent fonctionnel d'un Isar "en mémoire" pour l'isolation des tests (aucune donnée persistante entre tests ni avec la vraie base de l'app). `Isar.initializeIsarCore(download: true)` est appelé dans `setUpAll` (télécharge le binaire natif au premier lancement, mis en cache ensuite) — suivre `flutter test -j 1` comme documenté par `isar_community` pour éviter un téléchargement concurrent corrompu.
+**Leçon :** le nom "in-memory" du critère d'acceptation était une approximation ; vérifier l'API réelle du package avant de supposer qu'une fonctionnalité existe telle quelle.
+**Statut :** ✅ Résolu

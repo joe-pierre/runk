@@ -88,6 +88,10 @@ Miroir du modèle applicatif, avec un champ additionnel de synchronisation :
 class BookmarkEntity {
   Id isarId = Isar.autoIncrement;
   late String remoteId;      // correspond à bookmarks.id côté Supabase
+  String? userId;            // correspond à bookmarks.user_id — nullable tant
+                              // qu'aucune authentification n'existe (Phase 6),
+                              // rempli rétroactivement une fois l'utilisateur
+                              // authentifié (voir DECISIONS.md, Tâche 5)
   late String url;
   String? title;
   String? thumbnailUrl;
