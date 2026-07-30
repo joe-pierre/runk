@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runk/core/models/video_source.dart';
+import 'package:runk/core/services/deep_link_service.dart';
+import 'package:runk/core/services/deep_link_service_provider.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Notifier de test qui court-circuite `BookmarkRepository` (donc Isar et
 /// Supabase) : retourne directement une liste fixe, comme
@@ -63,4 +66,46 @@ void main() {
     expect(find.text('Ma vidéo'), findsOneWidget);
     expect(find.text('drole'), findsOneWidget);
   });
+
+  testWidgets(
+    'un tap sur une carte délègue la réouverture à DeepLinkService',
+    (tester) async {
+      final bookmark = VideoBookmark(
+        id: '1',
+        url: 'https://www.instagram.com/p/abc123/',
+        title: 'Un reel',
+        source: VideoSource.instagram,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      final launchedUris = <Uri>[];
+      final fakeDeepLinkService = DeepLinkService(
+        canLaunchUrl: (uri) async => true,
+        launchUrl: (uri, {mode = LaunchMode.platformDefault}) async {
+          launchedUris.add(uri);
+          return true;
+        },
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(
+              () => _FakeBookmarkList([bookmark]),
+            ),
+            deepLinkServiceProvider.overrideWithValue(fakeDeepLinkService),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Un reel'));
+      await tester.pumpAndSettle();
+
+      expect(launchedUris, [
+        Uri.parse('instagram://www.instagram.com/p/abc123/'),
+      ]);
+    },
+  );
 }

@@ -63,5 +63,19 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Schémas natifs non officiels interrogés par DeepLinkService
+	     (lib/core/services/deep_link_service.dart, Tâche 8) : requis pour
+	     que canOpenURL détecte une app installée (sinon iOS refuse
+	     silencieusement toute requête sur un schéma non déclaré ici). Voir
+	     BUGS_AND_ROADMAP.md pour le suivi de la fragilité de ces schémas
+	     non documentés par les plateformes elles-mêmes. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+		<string>snssdk1233</string>
+		<string>fb</string>
+		<string>twitter</string>
+		<string>vnd.youtube</string>
+	</array>
 </dict>
 </plist>
