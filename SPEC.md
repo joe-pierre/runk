@@ -25,7 +25,7 @@ Fonctionnement cible :
 | Framework mobile | Flutter | Confort développeur (pas React/RN), un seul codebase iOS+Android |
 | State management | Riverpod (`flutter_riverpod` + `riverpod_annotation`) | Testable, pas de BuildContext requis, génération de code |
 | Navigation | `go_router` | Standard Flutter moderne, gestion des deep links |
-| Base locale | Isar | Offline-first, rapide, NoSQL adapté au modèle simple de bookmark |
+| Base locale | Isar, via `isar_community`/`isar_community_generator` | Offline-first, rapide, NoSQL adapté au modèle simple de bookmark. Le package original `isar`/`isar_generator` est abandonné depuis Isar v3 et bloquait la mise à jour de Riverpod (voir DECISIONS.md, entrées "Riverpod 2.x" et "Migration isar_community") ; `isar_community` en est le fork communautaire activement maintenu, API identique. |
 | Backend | Supabase (Auth + Postgres + Storage) | SDK Flutter officiel maintenu, RLS natif, pas de backend custom à héberger |
 | Réception de partage | `receive_sharing_intent` | Gère Android Intent + iOS Share Extension avec une API unifiée |
 | Récupération de métadonnées | `http` + parsing manuel des balises `og:` + endpoints oEmbed officiels | Pas de solution tout-en-un fiable pour toutes les plateformes ciblées |

@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.senluxtech.runk"
     compileSdk = flutter.compileSdkVersion
-    // Version explicite requise par plusieurs plugins (isar_flutter_libs,
+    // Version explicite requise par plusieurs plugins (isar_community_flutter_libs,
     // receive_sharing_intent, path_provider, url_launcher, ...) qui embarquent
     // du code natif compilé avec un NDK plus récent que celui par défaut de
     // Flutter — voir DECISIONS.md.
@@ -28,7 +28,8 @@ android {
         applicationId = "com.senluxtech.runk"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // isar_community_flutter_libs impose minSdk 23 (Android 6.0) — voir DECISIONS.md.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
