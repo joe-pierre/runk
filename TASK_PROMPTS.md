@@ -216,7 +216,7 @@ Branche : feat/bookmark-data-layer
    - Crée `lib/features/bookmarks/domain/video_bookmark.dart` selon SPEC.md section 3.1 — modèle pur, sans dépendance à Isar ni Supabase
 
 2. **Datasource locale** :
-   - Crée `lib/features/bookmarks/data/bookmark_local_datasource.dart` avec le modèle Isar `BookmarkEntity` (annoté `@collection`, voir SPEC.md section 3.3) et ses méthodes CRUD locales
+   - Crée `lib/features/bookmarks/data/bookmark_local_datasource.dart` avec le modèle Isar `BookmarkEntity` (annoté `@collection`, package isar_community — voir pubspec.yaml et DECISIONS.md entrée "Migration vers isar_community" — SPEC.md section 3.3)
 
 3. **Datasource distante** :
    - Crée `lib/features/bookmarks/data/bookmark_remote_datasource.dart` : uniquement les appels Supabase (`insert`, `select`, `update`, `delete`), retournant des `Map` bruts — le mapping vers `VideoBookmark` se fait exclusivement dans le repository, jamais ici
