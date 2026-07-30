@@ -1,0 +1,232 @@
+# SPEC.md — Spécifications fonctionnelles et techniques
+
+## 1. Vue d'ensemble
+
+**Runk** (du wolof "garder / archiver") est une application mobile permettant de centraliser des vidéos trouvées sur différents réseaux sociaux (YouTube, Instagram, TikTok, Facebook, X/Twitter, Threads).
+
+Problème résolu : aujourd'hui, quand un utilisateur tombe sur une vidéo intéressante, il n'a aucun endroit unique pour la retrouver — les vidéos sauvegardées sont dispersées entre plusieurs apps, et l'utilisateur oublie souvent sur quelle plateforme il avait trouvé telle ou telle vidéo.
+
+Fonctionnement cible :
+1. L'utilisateur trouve une vidéo sur une app tierce (Instagram, TikTok, etc.)
+2. Il la partage vers Runk via le menu de partage natif du téléphone **— ou** copie simplement le lien puis ouvre Runk
+3. Runk récupère automatiquement la miniature et le titre de la vidéo
+4. L'utilisateur peut ajouter un nom personnalisé et des tags
+5. La vidéo est stockée dans Runk (uniquement l'URL et les métadonnées, jamais le fichier vidéo)
+6. Plus tard, l'utilisateur retrouve la vidéo dans Runk (par tag, recherche, ou liste chronologique) et tape sur la vignette pour l'ouvrir directement dans l'app source
+
+**Deux voies d'entrée équivalentes pour ajouter une vidéo :**
+- **Share Intent** — partage explicite via le menu natif du téléphone
+- **Détection de clipboard** — au retour au premier plan de l'app, Runk vérifie si le presse-papier contient un lien vidéo non déjà proposé, et affiche une bannière discrète de suggestion (jamais de sauvegarde automatique, voir section 4 règle 7)
+
+## 2. Stack technique
+
+| Composant | Choix | Justification |
+|---|---|---|
+| Framework mobile | Flutter | Confort développeur (pas React/RN), un seul codebase iOS+Android |
+| State management | Riverpod (`flutter_riverpod` + `riverpod_annotation`) | Testable, pas de BuildContext requis, génération de code |
+| Navigation | `go_router` | Standard Flutter moderne, gestion des deep links |
+| Base locale | Isar | Offline-first, rapide, NoSQL adapté au modèle simple de bookmark |
+| Backend | Supabase (Auth + Postgres + Storage) | SDK Flutter officiel maintenu, RLS natif, pas de backend custom à héberger |
+| Réception de partage | `receive_sharing_intent` | Gère Android Intent + iOS Share Extension avec une API unifiée |
+| Récupération de métadonnées | `http` + parsing manuel des balises `og:` + endpoints oEmbed officiels | Pas de solution tout-en-un fiable pour toutes les plateformes ciblées |
+| Ouverture de lien externe | `url_launcher` | Standard pour deep links + fallback navigateur |
+
+## 3. Modèle de données
+
+### 3.1 Modèle applicatif (Dart)
+
+```dart
+enum VideoSource { youtube, tiktok, instagram, facebook, twitter, threads, unknown }
+
+class VideoBookmark {
+  final String id;              // UUID généré côté client
+  final String url;              // URL originale partagée
+  final String title;            // titre auto ou saisi par l'utilisateur
+  final String? thumbnailUrl;    // image de prévisualisation
+  final VideoSource source;      // plateforme détectée
+  final bool isPartial;          // true si les métadonnées n'ont pas pu être récupérées entièrement
+  final List<String> tags;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? note;            // note libre optionnelle
+}
+```
+
+### 3.2 Schéma Supabase (Postgres)
+
+```sql
+create table bookmarks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  url text not null,
+  title text,
+  thumbnail_url text,
+  source text,
+  tags text[] default '{}',
+  note text,
+  is_partial boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table bookmarks enable row level security;
+
+create policy "Users can only access their own bookmarks"
+on bookmarks for all
+using (auth.uid() = user_id);
+
+create index on bookmarks using gin(tags);
+create index on bookmarks (user_id, created_at desc);
+```
+
+### 3.3 Modèle local (Isar)
+
+Miroir du modèle applicatif, avec un champ additionnel de synchronisation :
+
+```dart
+@collection
+class BookmarkEntity {
+  Id isarId = Isar.autoIncrement;
+  late String remoteId;      // correspond à bookmarks.id côté Supabase
+  late String url;
+  String? title;
+  String? thumbnailUrl;
+  late String source;
+  bool isPartial = false;
+  List<String> tags = [];
+  String? note;
+  late DateTime createdAt;
+  late DateTime updatedAt;
+  bool isSynced = false;     // false = en attente de sync vers Supabase
+  bool isDeletedLocally = false; // suppression en attente de propagation
+}
+```
+
+## 4. Règles métier critiques
+
+1. **Aucun fichier vidéo n'est jamais stocké** — Runk ne stocke que l'URL et les métadonnées (titre, miniature, tags). Le contenu reste hébergé sur la plateforme d'origine.
+2. **Offline-first** — toute action (ajout, tag, suppression) doit fonctionner sans connexion réseau. La synchronisation vers Supabase se fait dès que la connexion revient.
+3. **Dégradation propre des métadonnées** — si la récupération automatique du titre/miniature échoue (cas fréquent pour Facebook/Threads), le bookmark est **quand même créé**, marqué `is_partial = true`, avec un titre par défaut modifiable manuellement. On ne bloque jamais l'utilisateur.
+4. **Détection de plateforme par le domaine de l'URL**, jamais par un choix manuel de l'utilisateur (sauf cas `unknown`).
+5. **Un seul appui suffit pour rouvrir la vidéo** — priorité au deep link natif vers l'app source ; fallback automatique et silencieux vers le navigateur si le schéma natif échoue ou si l'app n'est pas installée.
+6. **Confidentialité** — chaque utilisateur ne voit et ne modifie que ses propres bookmarks (appliqué via RLS Supabase, jamais uniquement côté client).
+7. **Détection de clipboard non intrusive** — la lecture du presse-papier se fait uniquement au retour de l'app au premier plan (jamais en tâche de fond), ne déclenche **jamais** de sauvegarde automatique (confirmation utilisateur obligatoire via une bannière de suggestion), et ne propose jamais deux fois le même lien déjà accepté ou ignoré.
+
+## 5. Architecture code
+
+```
+lib/
+├── main.dart
+├── app/
+│   └── router.dart
+├── features/
+│   ├── bookmarks/
+│   │   ├── data/
+│   │   │   ├── bookmark_repository.dart
+│   │   │   ├── bookmark_local_datasource.dart      # Isar
+│   │   │   └── bookmark_remote_datasource.dart     # Supabase
+│   │   ├── domain/
+│   │   │   └── video_bookmark.dart
+│   │   └── presentation/
+│   │       ├── home_screen.dart
+│   │       ├── add_bookmark_sheet.dart
+│   │       └── bookmark_card.dart
+│   ├── tags/
+│   │   └── presentation/tags_screen.dart
+│   └── search/
+│       └── presentation/search_screen.dart
+└── core/
+    ├── services/
+    │   ├── share_intent_service.dart
+    │   ├── clipboard_service.dart
+    │   ├── deep_link_service.dart
+    │   ├── sync_service.dart
+    │   ├── supabase_service.dart
+    │   └── metadata/
+    │       ├── metadata_service.dart
+    │       ├── providers/
+    │       │   ├── metadata_provider.dart          # interface
+    │       │   ├── youtube_provider.dart
+    │       │   ├── tiktok_provider.dart
+    │       │   ├── twitter_provider.dart
+    │       │   ├── instagram_provider.dart
+    │       │   ├── facebook_provider.dart
+    │       │   └── threads_provider.dart
+    │       └── generic_fallback_provider.dart
+    └── utils/
+        └── source_detector.dart
+```
+
+**Règle non négociable :** aucun fichier ne doit dépasser une responsabilité unique. `metadata_service.dart` orchestre, il ne contient aucune logique de scraping spécifique à une plateforme — celle-ci vit exclusivement dans son propre `*_provider.dart`.
+
+## 6. Événements WebSocket / temps réel
+
+Aucun besoin de temps réel critique en V1 (Runk n'est pas collaboratif). Optionnel pour une V2 : utiliser **Supabase Realtime** sur la table `bookmarks` pour synchroniser instantanément entre plusieurs appareils du même utilisateur (ex: ajout sur mobile, apparition immédiate sur une future version web/tablette). Non implémenté en V1 — la synchronisation V1 se fait par polling/sync explicite (voir section 13).
+
+## 7. Endpoints / API
+
+Aucun backend custom : toutes les opérations passent par le SDK Supabase (PostgREST généré automatiquement + Auth).
+
+| Opération | Méthode SDK Supabase | Table |
+|---|---|---|
+| Créer un bookmark | `supabase.from('bookmarks').insert(...)` | bookmarks |
+| Lister les bookmarks | `supabase.from('bookmarks').select().order('created_at', ascending: false)` | bookmarks |
+| Modifier (tags, titre, note) | `supabase.from('bookmarks').update(...).eq('id', id)` | bookmarks |
+| Supprimer | `supabase.from('bookmarks').delete().eq('id', id)` | bookmarks |
+| Recherche par tag | `supabase.from('bookmarks').select().contains('tags', [tag])` | bookmarks |
+| Auth (inscription/connexion) | `supabase.auth.signUp / signInWithPassword` | auth.users (géré par Supabase) |
+
+## 8. Extensibilité
+
+Le point d'extension principal du projet est l'ajout d'une nouvelle plateforme vidéo. Pour ajouter une plateforme :
+
+1. Ajouter la valeur dans `enum VideoSource`
+2. Ajouter la détection de domaine dans `source_detector.dart`
+3. Créer `core/services/metadata/providers/<plateforme>_provider.dart` implémentant `MetadataProvider`
+4. Enregistrer le provider dans la liste de `metadata_service.dart`
+5. Ajouter le schéma de deep link (si connu) dans `deep_link_service.dart`
+6. Ajouter l'icône correspondante dans `assets/icons/`
+
+Aucune autre partie du code ne doit être modifiée pour ajouter une plateforme — c'est le test de validité de l'architecture en providers.
+
+## 9. Sécurité et validations
+
+- **RLS Supabase activé sur toutes les tables** — jamais de filtrage de sécurité uniquement côté client.
+- **Validation d'URL** avant tout traitement : schéma `http`/`https` obligatoire, rejet silencieux sinon (voir `ShareIntentService._isValidUrl`).
+- **Aucune clé secrète en dur dans le code** — uniquement `anon key` publique côté client, jamais de clé `service_role`.
+- **Scraping de métadonnées** : requêtes HTTP avec timeout court (5s max) pour éviter de bloquer l'UI si une plateforme tierce répond lentement ou plus du tout.
+- **Pas de stockage de contenu tiers** : seules les URLs de miniatures externes sont référencées (pas de re-upload), ce qui limite l'exposition légale liée au droit d'auteur.
+- **Lecture du clipboard respectueuse de la vie privée** : sur iOS 16+, utiliser l'API `detectPatterns` (vérifie la présence d'une URL sans lire ni exposer le contenu réel, évite la bannière système "Runk a collé depuis..."). Sur iOS < 16, la bannière système native est inévitable — limitation de la plateforme, pas un choix de conception à corriger côté app. Sur Android, la lecture reste silencieuse mais doit être strictement limitée au retour au premier plan (`AppLifecycleState.resumed`), jamais en arrière-plan.
+
+## 10. Identité visuelle
+
+- **Nom** : Runk
+- **Domaine** : runkapp.com
+- **Thème par défaut** : sombre (`ThemeData.dark(useMaterial3: true)`), cohérent avec un usage type "scroll de vidéos courtes"
+- Charte graphique détaillée (palette, typographie, icône) : à définir lors de la phase UI — non bloquant pour le développement fonctionnel.
+
+## 11. Écrans
+
+| Écran | Rôle |
+|---|---|
+| **Home** | Liste chronologique de tous les bookmarks, tri par date |
+| **Clipboard Suggestion Banner** | Bannière discrète et non bloquante affichée en haut de `HomeScreen` au retour au premier plan si un lien vidéo valide et nouveau est détecté dans le presse-papier ; deux actions : "Ajouter" (ouvre `AddBookmarkSheet`) ou "Ignorer" (le lien n'est plus reproposé) |
+| **Add Bookmark Sheet** | Modale déclenchée par le Share Intent, la Clipboard Suggestion Banner, ou un bouton "+", pré-remplie avec metadata, permet titre custom + tags |
+| **Tags** | Navigation par catégorie/tag |
+| **Search** | Recherche full-text sur titre + tags |
+
+Navigation : `Bottom Navigation Bar` à 3 onglets (Home / Tags / Recherche), la modale d'ajout se superpose par-dessus n'importe quel écran.
+
+## 12. Tâches
+
+Voir `TODO.md` pour le détail des phases et `TASK_PROMPTS.md` pour les instructions détaillées données à Claude Code sur chaque tâche.
+
+## 13. Race conditions
+
+| Scénario | Risque | Mitigation |
+|---|---|---|
+| Partage multiple rapide (plusieurs vidéos partagées coup sur coup) | Deux modales d'ajout qui se superposent, ou perte d'un des liens | File d'attente (`Queue<String>`) dans `ShareIntentService` — une modale à la fois, la suivante s'ouvre à la fermeture de la précédente |
+| Modification d'un bookmark sur deux appareils hors ligne, puis reconnexion simultanée | Conflit d'écriture sur Supabase | Politique **last-write-wins** basée sur `updated_at` (comportement par défaut du update Supabase) — accepté comme limitation V1, pas de merge intelligent |
+| Suppression locale pendant que la sync est en cours vers Supabase | Le bookmark supprimé pourrait réapparaître après sync | Le flag `isDeletedLocally` est vérifié en priorité par `sync_service.dart` avant tout envoi vers Supabase ; la suppression distante est confirmée avant suppression définitive locale |
+| Échec réseau en plein scraping de métadonnées | Bookmark bloqué en attente indéfiniment | Timeout de 5s (voir section 9) + fallback automatique vers `is_partial = true`, jamais de blocage de l'UI |
+| Retour au premier plan alors qu'un Share Intent est aussi en cours de traitement | La bannière clipboard et la modale d'ajout du Share Intent pourraient s'afficher simultanément | Le `ClipboardService` vérifie l'état de la file d'attente du `ShareIntentService` avant d'afficher sa bannière ; priorité systématique au Share Intent (action explicite de l'utilisateur) sur la suggestion clipboard (action passive) |

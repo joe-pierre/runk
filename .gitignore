@@ -1,3 +1,6 @@
+_notes/
+.env.local
+
 # Miscellaneous
 *.class
 *.log
