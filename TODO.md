@@ -39,11 +39,13 @@
 
 ## Phase 4 — UI de base
 
-- [ ] `AddBookmarkSheet` (modale d'ajout : thumbnail, titre éditable, tags, bouton sauvegarder)
-- [ ] `HomeScreen` (liste chronologique des bookmarks)
-- [ ] `BookmarkCard` (composant réutilisable d'affichage d'un bookmark)
+- [x] `AddBookmarkSheet` (modale d'ajout : thumbnail, titre éditable, tags, bouton sauvegarder)
+- [x] `HomeScreen` (liste chronologique des bookmarks)
+- [x] `BookmarkCard` (composant réutilisable d'affichage d'un bookmark)
 - [x] `BookmarkRepository` + `BookmarkLocalDatasource` (Isar) + `BookmarkRemoteDatasource` (Supabase)
-- [ ] Flux complet de bout en bout testé : partage → metadata → sauvegarde → affichage dans Home
+- [x] Branchement Riverpod : ouverture réelle d'Isar + `ProviderScope` dans `main.dart` (jusqu'ici seulement fait en test, voir DECISIONS.md Tâche 6)
+- [x] Branchement du Share Intent au widget racine (`ShareIntentGate`) + file d'attente pour partages multiples rapides (SPEC.md section 13)
+- [ ] Flux complet de bout en bout testé **sur appareil physique** : partage → metadata → sauvegarde → affichage dans Home persistant après redémarrage (vérifié en local : `flutter analyze`/`flutter test`/`flutter build apk --debug` OK, run sur `linux` desktop sans crash — reste à valider sur device réel, voir `BUGS_AND_ROADMAP.md`)
 
 ## Phase 4.5 — Détection de lien vidéo via clipboard
 

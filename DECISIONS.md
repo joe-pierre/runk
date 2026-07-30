@@ -189,3 +189,43 @@
 **Décision :** chaque test ouvre une instance Isar dans un répertoire temporaire (`Directory.systemTemp.createTempSync()`), supprimé dans `tearDown` — équivalent fonctionnel d'un Isar "en mémoire" pour l'isolation des tests (aucune donnée persistante entre tests ni avec la vraie base de l'app). `Isar.initializeIsarCore(download: true)` est appelé dans `setUpAll` (télécharge le binaire natif au premier lancement, mis en cache ensuite) — suivre `flutter test -j 1` comme documenté par `isar_community` pour éviter un téléchargement concurrent corrompu.
 **Leçon :** le nom "in-memory" du critère d'acceptation était une approximation ; vérifier l'API réelle du package avant de supposer qu'une fonctionnalité existe telle quelle.
 **Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 6 — Riverpod avec génération de code (`@riverpod`), première utilisation réelle
+
+**Contexte :** Tâche 6, première tâche qui utilise réellement Riverpod dans le code applicatif (`flutter_riverpod`/`riverpod_annotation`/`riverpod_generator` n'étaient présents que dans `pubspec.yaml` depuis la Tâche 1, jamais utilisés). Le prompt de tâche demande "un provider Riverpod" sans préciser style manuel vs génération de code.
+**Alternatives envisagées :** (1) providers manuels (`Provider`, `FutureProvider`, `StateNotifierProvider` écrits à la main) ; (2) génération de code via `@riverpod` (annotations + `riverpod_generator`), déjà ajoutée en dépendance de dev depuis la Tâche 1.
+**Décision :** option 2. Tous les providers de cette tâche (`bookmarkIsarProvider`, `bookmarkRepositoryProvider`, `metadataServiceProvider`, `videoMetadataProvider`, `shareIntentServiceProvider`, `bookmarkListProvider`) sont générés via `@riverpod`/`@Riverpod(keepAlive: true)`, cohérent avec la dépendance déjà posée et avec le nommage `xyzProvider` de CONVENTIONS.md.
+**Leçon :** une dépendance de génération de code ajoutée dès la Tâche 1 mais jamais exploitée est un signal qu'un style de codage était déjà tranché en amont — le confirmer explicitement à la première utilisation réelle plutôt que de re-décider silencieusement un style manuel.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 6 — Emplacement de l'ouverture d'Isar (`bookmarkIsarProvider` dans `features/bookmarks/data/`, pas `core/`)
+
+**Contexte :** Tâche 6, premier branchement réel d'Isar dans l'app (jusqu'ici ouvert uniquement dans `bookmark_repository_test.dart`, via un répertoire temporaire — voir DECISIONS.md Tâche 5). `main.dart` doit désormais ouvrir une vraie instance Isar dans le répertoire de documents de l'app.
+**Alternatives envisagées :** (1) `core/services/isar_service.dart`, symétrique de `SupabaseService` ; (2) directement dans `features/bookmarks/data/bookmark_repository_provider.dart`.
+**Décision :** option 2. `BookmarkEntitySchema` est propre à la feature bookmarks (seule collection Isar existante) — un service dans `core/` devrait soit importer ce schéma (inversion de dépendance `core/` → `feature/`, écarté depuis DECISIONS.md Tâche 4), soit rester vide de sens tant qu'aucune autre feature n'utilise Isar. Réévaluer si une autre feature (ex: historique clipboard, Tâche 6.5) a besoin de sa propre collection Isar : factoriser l'ouverture de l'instance `Isar` elle-même (pas les schémas) dans `core/` uniquement à ce moment-là.
+**Leçon :** ne pas anticiper une factorisation `core/` pour une techno (Isar) tant qu'un seul consommateur existe — le jour où un deuxième arrive, factoriser avec les deux cas réels sous les yeux plutôt que de deviner la bonne coupe à l'avance.
+**Statut :** 🔵 Choix assumé — à revisiter si Tâche 6.5 (clipboard) introduit une deuxième collection Isar.
+
+---
+
+## [CHOIX] Tâche 6 — `ShareIntentGate` placé comme `MaterialApp.home`, jamais au-dessus de `MaterialApp`
+
+**Contexte :** Tâche 6, branchement du Share Intent au widget racine pour ouvrir automatiquement `AddBookmarkSheet` (`showModalBottomSheet`). `showModalBottomSheet` nécessite un `BuildContext` descendant d'un `Navigator`/`Overlay`.
+**Alternatives envisagées :** (1) placer le widget d'écoute (`ShareIntentGate`) au-dessus de `MaterialApp` et lui fournir un `GlobalKey<NavigatorState>` pour atteindre un contexte valide ; (2) placer `ShareIntentGate` comme contenu de `MaterialApp.home` (donc déjà sous le `Navigator` créé par `MaterialApp`), et utiliser directement son propre `context`.
+**Décision :** option 2, plus simple — aucune `GlobalKey` à faire circuler, le `context` du `State` de `ShareIntentGate` est déjà valide pour `showModalBottomSheet`.
+**Leçon :** avant d'introduire une `GlobalKey<NavigatorState>` (mécanisme classique mais qui ajoute un point de couplage global), vérifier si le widget a juste besoin d'être positionné différemment dans l'arbre pour obtenir un contexte valide nativement.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 6 — Dégradation propre si `ShareIntentService.initialize()` échoue
+
+**Contexte :** Tâche 6, vérification manuelle sur `flutter run -d linux` (aucun appareil Android/iOS physique disponible dans cet environnement, voir `BUGS_AND_ROADMAP.md`). `ShareIntentService.initialize()` lève `MissingPluginException` sur toute plateforme sans canal natif `receive_sharing_intent` (desktop, ou iOS avant configuration complète de la Share Extension dans Xcode — voir DECISIONS.md Tâche 3), ce qui faisait planter toute l'application au démarrage (exception non interceptée dans `ShareIntentGate.initState`).
+**Cause :** le prompt de tâche ne mentionnait pas ce cas ; l'appel initial ne gérait aucune exception.
+**Décision :** `ShareIntentGate._initialize` encapsule l'appel dans un `try/catch` sur `Exception`, journalisé via `debugPrint` (jamais un `catch` silencieux, voir CONVENTIONS.md section Réponses API) — cohérent avec SPEC.md section 4 règle 3 (dégradation propre, ne jamais bloquer l'utilisateur) déjà appliquée à la récupération de métadonnées.
+**Leçon :** l'absence d'appareil physique/émulateur mobile dans l'environnement de développement a permis de détecter un vrai bug (crash au démarrage sur toute plateforme sans le plugin) qu'un test unitaire seul n'aurait pas forcément révélé — le run sur `linux desktop`, bien que hors cible, reste un filet de sécurité utile.
+**Statut :** ✅ Résolu
