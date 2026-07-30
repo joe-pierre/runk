@@ -21,13 +21,13 @@
 
 ## Phase 3 — Metadata Service (YouTube + TikTok d'abord)
 
-- [ ] Création de l'interface `MetadataProvider`
-- [ ] `SourceDetector` (détection de plateforme par domaine)
-- [ ] `YoutubeProvider` (oEmbed officiel)
-- [ ] `TiktokProvider` (oEmbed officiel)
-- [ ] `GenericFallbackProvider` (titre par défaut + `is_partial = true`)
-- [ ] `MetadataService` (orchestrateur, sélection du provider adapté)
-- [ ] Tests unitaires sur chaque provider
+- [x] Création de l'interface `MetadataProvider`
+- [x] `SourceDetector` (détection de plateforme par domaine)
+- [x] `YoutubeProvider` (oEmbed officiel)
+- [x] `TiktokProvider` (oEmbed officiel)
+- [x] `GenericFallbackProvider` (titre par défaut + `is_partial = true`)
+- [x] `MetadataService` (orchestrateur, sélection du provider adapté)
+- [x] Tests unitaires sur chaque provider
 
 ## Phase 3.5 — CI et test d'intégration du flux interne
 
