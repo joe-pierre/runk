@@ -239,6 +239,16 @@ Ne fais **aucun commit** avant que je te dise explicitement "commit".
 **Critère d'acceptation :** un test d'intégration create → read → update → delete passe sur `BookmarkRepository` avec un Isar en mémoire de test, sans dépendre d'une connexion Supabase réelle (mock du datasource remote).
 ```
 
+> **Règles transversales, rappelées dans chaque prompt mais valables sur TOUTES les tâches sans exception :**
+> - Code modulaire, un fichier = une responsabilité. Aucun "god file".
+> - Séparation stricte des couches : `presentation/` ne contient jamais de logique métier ni d'appel réseau direct ; `data/` ne contient jamais de widget.
+> - Nommage explicite (voir `CONVENTIONS.md`) — aucune abréviation ambiguë (`bkm`, `svc`, `tmp` proscrits).
+> - Chaque classe et fonction publique documentée par un commentaire `///` expliquant son rôle, pas seulement sa signature.
+> - Aucune ambiguïté n'est tranchée silencieusement — elle est documentée dans `DECISIONS.md` selon le format standard.
+> - **Aucun commit n'est fait avant validation explicite** ("commit" dit clairement par l'utilisateur).
+> - À la fin de la tâche (une fois le commit autorisé) : mettre à jour `TODO.md` (cocher les cases), `DECISIONS.md` (si un choix ou un bug a été traité) et `BUGS_AND_ROADMAP.md` (si pertinent).
+
+
 ---
 
 ## TÂCHE 6 — UI : `AddBookmarkSheet` et `HomeScreen`
