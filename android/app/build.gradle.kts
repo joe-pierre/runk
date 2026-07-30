@@ -8,7 +8,11 @@ plugins {
 android {
     namespace = "com.senluxtech.runk"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Version explicite requise par plusieurs plugins (isar_flutter_libs,
+    // receive_sharing_intent, path_provider, url_launcher, ...) qui embarquent
+    // du code natif compilé avec un NDK plus récent que celui par défaut de
+    // Flutter — voir DECISIONS.md.
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
