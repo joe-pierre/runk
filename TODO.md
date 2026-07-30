@@ -7,6 +7,7 @@
 - [x] Création du projet Supabase + exécution du schéma SQL (table `bookmarks` + RLS)
 - [x] Configuration de `Env` (variables Supabase via `--dart-define`)
 - [x] Initialisation de Supabase dans `main.dart`
+- [x] Dépendances Isar maintenues via `isar_community`/`isar_community_generator` (fork actif), permettant de remonter `flutter_riverpod`/`riverpod_annotation`/`riverpod_generator` en 3.x (voir `DECISIONS.md`, entrée "Migration vers isar_community")
 
 ## Phase 2 — Share Intent
 
