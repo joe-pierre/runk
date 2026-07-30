@@ -54,7 +54,7 @@ final class BookmarkListProvider
   BookmarkList create() => BookmarkList();
 }
 
-String _$bookmarkListHash() => r'b7f37ab9235b604d3d95ff219bc3e6c32db8e7fc';
+String _$bookmarkListHash() => r'0af8700923197cdba735dfe7d4f57f6132eec5f1';
 
 /// Expose la liste des bookmarks à la couche présentation, triée par date de
 /// création décroissante (tri déjà appliqué par

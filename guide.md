@@ -258,6 +258,15 @@ flutter run --dart-define-from-file=.env.local
 3. Ouvre Instagram/TikTok sur le téléphone, partage une vidéo, sélectionne "Runk" dans le menu de partage
 4. Vérifie que l'app s'ouvre avec la modale d'ajout pré-remplie
 
+### 5.4 Tester la détection clipboard en conditions réelles
+
+1. Sur un appareil physique (ou simulateur/émulateur, la lecture du presse-papier fonctionne aussi hors appareil physique contrairement au Share Intent), copie un lien vidéo valide (ex: lien TikTok) depuis une autre app ou le navigateur.
+2. Reviens sur Runk (l'app doit déjà être ouverte en arrière-plan, ou la relancer déclenche aussi la transition vers `resumed`) → la bannière de suggestion doit apparaître en haut de `HomeScreen`, une seule fois.
+3. Teste "Ignorer" : la bannière se ferme, quitte et rouvre l'app avec le même lien toujours dans le presse-papier → la bannière **ne doit plus jamais réapparaître** pour ce lien.
+4. Teste "Ajouter" : `AddBookmarkSheet` s'ouvre pré-remplie avec ce lien.
+5. Partage explicitement un autre lien vidéo (Share Intent) **pendant** qu'un lien différent est aussi présent dans le presse-papier depuis peu : vérifie que seule la modale du Share Intent s'affiche, jamais la bannière clipboard en même temps.
+6. **Spécifique iOS** : sur iOS 16+, comme sur iOS < 16, la bannière système native ("Runk a collé depuis…") s'affichera à la lecture du presse-papier — c'est une limitation de plateforme documentée et acceptée (voir `DECISIONS.md`, entrée "Tâche 6.5"), pas un bug : l'API `UIPasteboard.detectPatterns` qui permettrait de l'éviter sur iOS 16+ nécessiterait un canal de plateforme Swift custom, non implémenté à ce stade (pas d'environnement Xcode disponible pour le développer, voir aussi section 4.2).
+
 ---
 
 ## 6. Tester l'application
@@ -301,6 +310,7 @@ Aucun warning ne doit être ignoré sans justification documentée dans `DECISIO
 - [ ] Fonctionnement hors ligne (mode avion) → l'ajout reste possible localement
 - [ ] Reconnexion réseau → sync automatique vers Supabase
 - [ ] Suppression d'un bookmark → synchronisée sur un second appareil connecté au même compte
+- [ ] Détection clipboard : lien copié → bannière affichée une seule fois, "Ignorer" empêche toute réapparition, priorité au Share Intent en cas de simultanéité (voir section 5.4)
 
 ---
 

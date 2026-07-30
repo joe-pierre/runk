@@ -229,3 +229,35 @@
 **Décision :** `ShareIntentGate._initialize` encapsule l'appel dans un `try/catch` sur `Exception`, journalisé via `debugPrint` (jamais un `catch` silencieux, voir CONVENTIONS.md section Réponses API) — cohérent avec SPEC.md section 4 règle 3 (dégradation propre, ne jamais bloquer l'utilisateur) déjà appliquée à la récupération de métadonnées.
 **Leçon :** l'absence d'appareil physique/émulateur mobile dans l'environnement de développement a permis de détecter un vrai bug (crash au démarrage sur toute plateforme sans le plugin) qu'un test unitaire seul n'aurait pas forcément révélé — le run sur `linux desktop`, bien que hors cible, reste un filet de sécurité utile.
 **Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 6.5 — Historique clipboard via `SharedPreferences`, pas une 2e collection Isar
+
+**Contexte :** Tâche 6.5, mémorisation des liens clipboard déjà proposés/ignorés. Le prompt de tâche laissait le choix ("SharedPreferences ou table Isar dédiée"). DECISIONS.md, entrée Tâche 6, notait explicitement qu'il faudrait réévaluer l'emplacement de l'ouverture d'Isar si cette tâche introduisait une 2e collection.
+**Alternatives envisagées :** (1) une collection Isar dédiée (`ClipboardHistoryEntity`), avec tout l'appareillage repository/datasource déjà en place pour les bookmarks ; (2) `SharedPreferences` (déjà une dépendance transitive résolue via `supabase_flutter`/`receive_sharing_intent`, `shared_preferences 2.5.3`), ajoutée en dépendance directe.
+**Décision :** option 2. Une simple liste d'URLs déjà vues ne justifie pas une 2e collection Isar avec son repository dédié — c'est un état d'interface local (jamais synchronisé sur Supabase, voir contraintes de la tâche), pas une donnée métier. `ClipboardHistoryStore` (`lib/core/services/clipboard_history_store.dart`) encapsule les deux opérations (`hasBeenSeen`/`markAsSeen`) derrière `SharedPreferences`.
+**Conséquence sur la décision Tâche 6 :** la question "réévaluer l'emplacement de l'ouverture d'Isar si Tâche 6.5 introduit une 2e collection" ne se pose plus — aucune 2e collection n'est introduite, `bookmarkIsarProvider` reste dans `features/bookmarks/data/`.
+**Leçon :** avant d'ajouter une 2e collection Isar (ou toute nouvelle source de données), vérifier si un stockage plus simple déjà présent dans l'arbre de dépendances (ici `SharedPreferences`, déjà résolu transitivement) suffit au besoin réel.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 6.5 — Priorité Share Intent > clipboard sans modifier `ShareIntentService`
+
+**Contexte :** Tâche 6.5, contrainte explicite : ne pas modifier `ShareIntentService`. SPEC.md section 13 documente pourtant la mitigation comme si `ShareIntentService` exposait l'état de sa file d'attente ("le `ClipboardService` vérifie l'état de la file d'attente du `ShareIntentService`") — en réalité cette file (`Queue<String>`) vit dans `ShareIntentGate` (voir DECISIONS.md, Tâche 6), pas dans le service lui-même. `ShareIntentService` n'expose que `sharedUrlStream`, aucun état de traitement.
+**Alternatives envisagées :** (1) ajouter malgré tout un état de file d'attente à `ShareIntentService` — écarté, contredit directement la consigne de la tâche ; (2) exposer l'état de traitement depuis `ShareIntentGate` (widget que la tâche autorise à modifier) via un nouveau provider Riverpod dédié, consulté par la logique clipboard.
+**Décision :** option 2. `shareIntentProcessingProvider` (`lib/features/bookmarks/presentation/share_intent_processing_provider.dart`), un `Notifier<bool>` simple, mis à jour par `ShareIntentGate._enqueueUrl`/`_processQueue` (vrai dès qu'une URL est en attente ou en cours d'affichage, faux une fois la file vidée). `ClipboardSuggestion` (`clipboard_suggestion_provider.dart`) le consulte avant d'afficher toute URL détectée par `ClipboardService` — `ShareIntentService` reste inchangé.
+**Leçon :** quand SPEC.md décrit une mitigation en termes d'un composant qui n'expose pas réellement l'état nécessaire, et qu'une consigne interdit explicitement de le modifier, préférer exposer l'état depuis le composant qui le détient réellement (ici la présentation, `ShareIntentGate`) plutôt que de forcer une modification interdite ou de dupliquer un état de file d'attente.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 6.5 — `detectPatterns` iOS 16+ non implémenté, bannière système acceptée sur toutes les versions d'iOS
+
+**Contexte :** Tâche 6.5, critère de vérification manuel mentionnant `detectPatterns` (iOS 16+) "si le plugin le permet". SPEC.md section 9 recommande cette API native pour éviter la bannière système "Runk a collé depuis…" au retour au premier plan.
+**Problème :** `package:flutter/services.dart` (`Clipboard.getData`) n'expose pas `UIPasteboard.detectPatterns` — cette API nécessiterait un canal de plateforme Swift custom écrit et testé dans Xcode, indisponible dans cet environnement de développement Linux sans macOS (même limitation que la Share Extension iOS, voir DECISIONS.md Tâche 3).
+**Alternatives envisagées :** (1) écrire un canal de plateforme Swift non testable dans cette session, au risque de livrer du code invérifiable ; (2) utiliser la lecture standard `Clipboard.getData` sur toutes les plateformes/versions, et documenter la limitation plutôt que de la contourner à l'aveugle.
+**Décision :** option 2, cohérente avec le prompt de tâche lui-même ("bannière système native acceptée comme limitation de plateforme, documentée en commentaire `///`" pour iOS < 16 — étendu ici à iOS 16+ également, faute d'implémentation possible de `detectPatterns`). Documenté en commentaire `///` sur `ClipboardService` et dans `guide.md` section 5.4.
+**Leçon :** cohérent avec la leçon déjà tirée en Tâche 3 — face à une API native non exposée par Flutter et non implémentable sans l'outillage de la plateforme cible, documenter la limitation plutôt que de livrer un correctif invérifiable.
+**Statut :** 🟡 Partiel — comportement standard fonctionnel et testé (Android + logique Dart), `detectPatterns` natif iOS non implémenté, à reprendre si un environnement macOS/Xcode devient disponible (voir `BUGS_AND_ROADMAP.md`).
