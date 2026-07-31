@@ -82,4 +82,60 @@ class BookmarkLocalDatasource {
     if (entity == null) return;
     await _isar.writeTxn(() => _isar.bookmarkEntitys.delete(entity.isarId));
   }
+
+  /// Retourne les entités créées/modifiées localement en attente d'envoi vers
+  /// Supabase (`isSynced: false`), à l'exclusion de celles déjà marquées pour
+  /// suppression (voir [getAllPendingDeletion]) — utilisé par
+  /// `SyncService` (Tâche 9) pour son rattrapage périodique.
+  Future<List<BookmarkEntity>> getAllPendingUpload() {
+    return _isar.bookmarkEntitys
+        .filter()
+        .isSyncedEqualTo(false)
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .findAll();
+  }
+
+  /// Retourne les entités marquées `isDeletedLocally: true`, dont la
+  /// suppression distante reste à confirmer (voir SPEC.md section 13) —
+  /// vérifiées en priorité par `SyncService` avant tout autre envoi.
+  Future<List<BookmarkEntity>> getAllPendingDeletion() {
+    return _isar.bookmarkEntitys
+        .filter()
+        .isDeletedLocallyEqualTo(true)
+        .findAll();
+  }
+
+  /// Retourne les [BookmarkEntity.remoteId] des entités déjà confirmées
+  /// synchronisées et non supprimées localement — sert à `SyncService` pour
+  /// détecter un bookmark supprimé sur un autre appareil (absent des lignes
+  /// distantes rapatriées, mais toujours présent localement).
+  Future<List<String>> getAllSyncedRemoteIds() async {
+    final entities = await _isar.bookmarkEntitys
+        .filter()
+        .isSyncedEqualTo(true)
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .findAll();
+    return entities.map((entity) => entity.remoteId).toList();
+  }
+
+  /// Recherche full-text locale sur le titre ou les tags (voir SPEC.md
+  /// section 11 — écran Recherche) : aucune requête réseau, la donnée locale
+  /// est la seule source consultée. Insensible à la casse, résultats triés
+  /// par date de création décroissante.
+  Future<List<BookmarkEntity>> searchByTitleOrTags(String query) {
+    return _isar.bookmarkEntitys
+        .filter()
+        .isDeletedLocallyEqualTo(false)
+        .and()
+        .group(
+          (filterBuilder) => filterBuilder
+              .titleContains(query, caseSensitive: false)
+              .or()
+              .tagsElementContains(query, caseSensitive: false),
+        )
+        .sortByCreatedAtDesc()
+        .findAll();
+  }
 }
