@@ -7,7 +7,10 @@ plugins {
 
 android {
     namespace = "com.senluxtech.runk"
-    compileSdk = flutter.compileSdkVersion
+    // Version explicite requise par androidx.core:core-ktx 1.18.0 (dépendance
+    // transitive de connectivity_plus, ajouté Tâche 9 pour SyncService), qui
+    // exige de compiler contre l'API 36 — voir DECISIONS.md.
+    compileSdk = 36
     // Version explicite requise par plusieurs plugins (isar_community_flutter_libs,
     // receive_sharing_intent, path_provider, url_launcher, ...) qui embarquent
     // du code natif compilé avec un NDK plus récent que celui par défaut de
