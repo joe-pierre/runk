@@ -1,0 +1,36 @@
+name: CI
+
+# Déclenché sur chaque pull_request (voir CONVENTIONS.md section Tests et
+# TASK_PROMPTS.md Tâche 10) : une PR qui échoue à `flutter analyze` ou
+# `flutter test` ne doit pas pouvoir être fusionnée. `flutter analyze` sort
+# avec un code non nul dès qu'un warning est présent (comportement par
+# défaut de l'analyzer Dart), donc aucune option supplémentaire n'est
+# nécessaire pour satisfaire cette exigence.
+on:
+  pull_request:
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v4
+
+      - name: Installation de Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Version fixée sur celle utilisée en développement local (voir
+          # DECISIONS.md, entrée Tâche 10), pour un comportement reproductible
+          # entre les runs CI et les vérifications locales.
+          flutter-version: '3.32.0'
+          channel: 'stable'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test

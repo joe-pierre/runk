@@ -277,6 +277,31 @@ flutter run --dart-define-from-file=.env.local
 flutter test
 ```
 
+### 6.1 bis Test d'intégration du flux interne
+
+`integration_test/app_flow_test.dart` (Tâche 10) rejoue le flux principal
+Share Intent → Metadata → Save → affichage de bout en bout via
+`WidgetTester`, sans dépendre d'aucune app tierce réelle : une URL déjà
+validée est émise directement dans le stream d'un `ShareIntentService` fake,
+ce qui ouvre `AddBookmarkSheet`, déclenche la sauvegarde via
+`BookmarkRepository` (Isar en répertoire temporaire, aucun appel Supabase
+réel) et vérifie que `HomeScreen` affiche le nouveau bookmark.
+
+S'exécute comme un test Flutter classique (pas de `flutter drive` ni
+d'appareil physique requis), mais nécessite de préciser un appareil cible
+explicitement s'il y en a plusieurs de connectés :
+
+```bash
+flutter test integration_test
+# ou, si plusieurs appareils/plateformes sont détectés :
+flutter test integration_test -d linux
+```
+
+Ce test complète, sans la remplacer, la checklist manuelle sur appareil
+physique (section 6.3 ci-dessous) — le partage réel depuis Instagram/TikTok
+et les deep links de retour vers les apps sources restent hors de son
+périmètre (voir `DECISIONS.md`, entrée Tâche 10).
+
 Structure attendue des tests (voir `CONVENTIONS.md`) :
 ```
 test/

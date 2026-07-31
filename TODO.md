@@ -31,11 +31,12 @@
 
 ## Phase 3.5 — CI et test d'intégration du flux interne
 
-- [ ] Workflow GitHub Actions : `flutter analyze` + `flutter test` déclenchés sur chaque pull request
-- [ ] Configuration du cache des dépendances Flutter pour accélérer la CI
-- [ ] Mise en place du dossier `integration_test/`
-- [ ] Test d'intégration du flux interne : URL déjà validée → ouverture modale → sauvegarde → apparition dans `HomeScreen` (sans dépendance à une app tierce réelle)
-- [ ] Documentation dans `guide.md` de la commande pour lancer ce test en local (`flutter test integration_test`)
+- [x] Workflow GitHub Actions : `flutter analyze` + `flutter test` déclenchés sur chaque pull request (`.github/workflows/ci.yml`)
+- [x] Configuration du cache des dépendances Flutter pour accélérer la CI (`subosito/flutter-action`, `cache: true`)
+- [x] Mise en place du dossier `integration_test/`
+- [x] Test d'intégration du flux interne : URL déjà validée → ouverture modale → sauvegarde → apparition dans `HomeScreen` (sans dépendance à une app tierce réelle) — `integration_test/app_flow_test.dart`
+- [x] Documentation dans `guide.md` de la commande pour lancer ce test en local (`flutter test integration_test`)
+- [x] `flutter test` complet débloqué (voir `DECISIONS.md`, entrée Tâche 10 — blocage `testWidgets`/Isar) — reste deux échecs préexistants sans rapport, non corrigés dans cette tâche (voir `BUGS_AND_ROADMAP.md`, section Points de vigilance, Tâche 10)
 
 ## Phase 4 — UI de base
 
