@@ -161,6 +161,99 @@ class BookmarkRepository {
     }
   }
 
+  /// Rattrape toute écriture locale qui n'a pas encore atteint Supabase —
+  /// appelé par `SyncService` (Tâche 9) à la reconnexion réseau et
+  /// périodiquement, jamais par la couche présentation directement.
+  ///
+  /// Traite les suppressions en attente (`isDeletedLocally`) **avant** tout
+  /// autre envoi (voir SPEC.md section 13) : un bookmark qu'un autre flux
+  /// tenterait de re-synchroniser entre-temps ne doit jamais réapparaître
+  /// après avoir été supprimé localement. Les créations/modifications en
+  /// attente (`isSynced: false`) sont ensuite envoyées via `upsert` distant
+  /// (pas de distinction insert/update ici — l'entité a pu être créée puis
+  /// modifiée hors ligne plusieurs fois avant ce rattrapage).
+  Future<void> syncPendingChanges() async {
+    final pendingDeletions = await _localDatasource.getAllPendingDeletion();
+    for (final entity in pendingDeletions) {
+      if (entity.userId == null) continue;
+      try {
+        await _remoteDatasource.delete(entity.remoteId);
+        await _localDatasource.deleteByRemoteId(entity.remoteId);
+      } on Exception catch (cause) {
+        _logSyncFailure(BookmarkRemoteSyncException(entity.remoteId, cause));
+      }
+    }
+
+    final pendingUploads = await _localDatasource.getAllPendingUpload();
+    for (final entity in pendingUploads) {
+      if (entity.userId == null) continue;
+      try {
+        await _remoteDatasource.upsert(_toRemoteMap(entity));
+        entity.isSynced = true;
+        await _localDatasource.upsert(entity);
+      } on Exception catch (cause) {
+        _logSyncFailure(BookmarkRemoteSyncException(entity.remoteId, cause));
+      }
+    }
+  }
+
+  /// Rapatrie vers l'Isar local les bookmarks distants absents ou plus
+  /// récents que leur copie locale — c'est ce qui permet à un bookmark créé
+  /// sur un premier appareil d'apparaître sur un second (voir critère
+  /// d'acceptation de la Tâche 9). Appelé par `SyncService` uniquement
+  /// lorsqu'une session Supabase active existe (voir `SyncService`).
+  ///
+  /// Résolution de conflit **last-write-wins** sur `updated_at` (voir
+  /// SPEC.md section 13, décision déjà actée) : si la ligne distante est plus
+  /// récente que la copie locale, elle écrase cette dernière. Une entité
+  /// locale déjà synchronisée mais absente des lignes distantes rapatriées a
+  /// été supprimée depuis un autre appareil : elle est alors retirée
+  /// localement aussi.
+  Future<void> pullRemoteChanges() async {
+    final remoteRows = await _remoteDatasource.selectAll();
+    final remoteIds = <String>{};
+
+    for (final row in remoteRows) {
+      final remoteId = row['id'] as String;
+      remoteIds.add(remoteId);
+      final remoteUpdatedAt = DateTime.parse(row['updated_at'] as String);
+      final existing = await _localDatasource.findByRemoteId(remoteId);
+
+      if (existing == null) {
+        await _localDatasource.upsert(_fromRemoteMap(row));
+        continue;
+      }
+      if (existing.isDeletedLocally) {
+        // Suppression locale en attente : ne pas ressusciter l'entité tant
+        // que la suppression distante n'a pas été tentée (voir
+        // syncPendingChanges).
+        continue;
+      }
+      if (remoteUpdatedAt.isAfter(existing.updatedAt)) {
+        await _localDatasource.upsert(
+          _fromRemoteMap(row)..isarId = existing.isarId,
+        );
+      }
+    }
+
+    final syncedRemoteIds = await _localDatasource.getAllSyncedRemoteIds();
+    for (final remoteId in syncedRemoteIds) {
+      if (!remoteIds.contains(remoteId)) {
+        await _localDatasource.deleteByRemoteId(remoteId);
+      }
+    }
+  }
+
+  /// Recherche full-text locale sur titre + tags (voir SPEC.md section 11) —
+  /// délègue entièrement à [BookmarkLocalDatasource.searchByTitleOrTags],
+  /// jamais d'appel à [_remoteDatasource] : la donnée locale est la seule
+  /// source de vérité pour l'affichage d'une recherche (voir CONVENTIONS.md,
+  /// contrainte de la Tâche 9).
+  Future<List<VideoBookmark>> searchBookmarks(String query) async {
+    final entities = await _localDatasource.searchByTitleOrTags(query);
+    return entities.map(_toBookmark).toList();
+  }
+
   /// Journalise un échec de synchronisation distant réel (jamais le cas
   /// "pas encore authentifié", filtré en amont) — au minimum un log
   /// explicite, jamais un `catch` silencieux (voir CONVENTIONS.md section
@@ -183,6 +276,24 @@ class BookmarkRepository {
     'created_at': entity.createdAt.toIso8601String(),
     'updated_at': entity.updatedAt.toIso8601String(),
   };
+
+  /// Reconstruit une [BookmarkEntity] locale à partir d'une ligne distante
+  /// brute (voir [pullRemoteChanges]) — toujours marquée `isSynced: true` et
+  /// `isDeletedLocally: false`, puisqu'elle vient d'être lue depuis Supabase.
+  BookmarkEntity _fromRemoteMap(Map<String, dynamic> row) => BookmarkEntity()
+    ..remoteId = row['id'] as String
+    ..userId = row['user_id'] as String?
+    ..url = row['url'] as String
+    ..title = row['title'] as String?
+    ..thumbnailUrl = row['thumbnail_url'] as String?
+    ..source = row['source'] as String
+    ..isPartial = row['is_partial'] as bool? ?? false
+    ..tags = List<String>.from(row['tags'] as List? ?? const [])
+    ..note = row['note'] as String?
+    ..createdAt = DateTime.parse(row['created_at'] as String)
+    ..updatedAt = DateTime.parse(row['updated_at'] as String)
+    ..isSynced = true
+    ..isDeletedLocally = false;
 
   VideoBookmark _toBookmark(BookmarkEntity entity) => VideoBookmark(
     id: entity.remoteId,

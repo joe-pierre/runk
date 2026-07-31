@@ -6,6 +6,7 @@ import 'package:runk/core/services/deep_link_service.dart';
 import 'package:runk/core/services/deep_link_service_provider.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
+import 'package:runk/features/bookmarks/presentation/bookmark_tag_filter_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -106,6 +107,58 @@ void main() {
       expect(launchedUris, [
         Uri.parse('instagram://www.instagram.com/p/abc123/'),
       ]);
+    },
+  );
+
+  testWidgets(
+    'filtre les bookmarks par tag quand bookmarkTagFilterProvider est actif, '
+    'et le retire au tap sur le chip',
+    (tester) async {
+      final withTag = VideoBookmark(
+        id: '1',
+        url: 'https://youtube.com/watch?v=abc',
+        title: 'Vidéo cuisine',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        tags: const ['cuisine'],
+      );
+      final withoutTag = VideoBookmark(
+        id: '2',
+        url: 'https://youtube.com/watch?v=xyz',
+        title: 'Vidéo dev',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        tags: const ['dev'],
+      );
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(
+            () => _FakeBookmarkList([withTag, withoutTag]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(bookmarkTagFilterProvider.notifier).select('cuisine');
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vidéo cuisine'), findsOneWidget);
+      expect(find.text('Vidéo dev'), findsNothing);
+      expect(find.text('Filtré par : cuisine'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.cancel));
+      await tester.pumpAndSettle();
+
+      expect(container.read(bookmarkTagFilterProvider), isNull);
+      expect(find.text('Vidéo dev'), findsOneWidget);
     },
   );
 }

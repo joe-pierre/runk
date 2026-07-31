@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/services/deep_link_service_provider.dart';
-import '../domain/video_bookmark.dart';
 import 'bookmark_card.dart';
 import 'bookmark_list_provider.dart';
+import 'bookmark_tag_filter_provider.dart';
 import 'clipboard_suggestion_banner.dart';
+import 'open_bookmark_action.dart';
 
 /// Écran d'accueil : liste chronologique (date de création décroissante) de
 /// tous les bookmarks non supprimés (voir SPEC.md section 11).
@@ -19,18 +19,36 @@ import 'clipboard_suggestion_banner.dart';
 /// réouverture à `DeepLinkService.openInSource` (voir SPEC.md section 4
 /// règle 5) — l'écran ne décide lui-même d'aucun schéma natif ni fallback,
 /// il se contente de transmettre le résultat à l'utilisateur.
+///
+/// Si [bookmarkTagFilterProvider] est actif (venant de `TagsScreen`), filtre
+/// la liste sur ce tag et affiche un chip permettant de retirer le filtre —
+/// `BookmarkCard` reste le seul widget d'affichage d'un bookmark, aucune
+/// duplication (voir contrainte de la Tâche 9).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookmarksAsync = ref.watch(bookmarkListProvider);
+    final tagFilter = ref.watch(bookmarkTagFilterProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Runk')),
       body: Column(
         children: [
           const ClipboardSuggestionBanner(),
+          if (tagFilter != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Chip(
+                  label: Text('Filtré par : $tagFilter'),
+                  onDeleted: () =>
+                      ref.read(bookmarkTagFilterProvider.notifier).clear(),
+                ),
+              ),
+            ),
           Expanded(
             child: bookmarksAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -40,11 +58,18 @@ class HomeScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-              data: (bookmarks) {
+              data: (allBookmarks) {
+                final bookmarks = tagFilter == null
+                    ? allBookmarks
+                    : allBookmarks
+                          .where((bookmark) => bookmark.tags.contains(tagFilter))
+                          .toList();
                 if (bookmarks.isEmpty) {
                   return Center(
                     child: Text(
-                      'Partagez une vidéo vers Runk pour commencer.',
+                      tagFilter == null
+                          ? 'Partagez une vidéo vers Runk pour commencer.'
+                          : 'Aucun bookmark avec ce tag.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   );
@@ -61,7 +86,7 @@ class HomeScreen extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: BookmarkCard(
                           bookmark: bookmark,
-                          onTap: () => _openBookmark(context, ref, bookmark),
+                          onTap: () => openBookmark(context, ref, bookmark),
                         ),
                       );
                     },
@@ -72,25 +97,6 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Délègue la réouverture de [bookmark] à [DeepLinkService.openInSource], et
-/// affiche un message d'erreur discret si ni le schéma natif ni le
-/// navigateur n'ont pu ouvrir la vidéo (cas extrême, voir doc de
-/// [DeepLinkService.openInSource]) — ne plante jamais l'écran.
-Future<void> _openBookmark(
-  BuildContext context,
-  WidgetRef ref,
-  VideoBookmark bookmark,
-) async {
-  final opened = await ref
-      .read(deepLinkServiceProvider)
-      .openInSource(bookmark.url, bookmark.source);
-  if (!opened && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Impossible d\'ouvrir cette vidéo.')),
     );
   }
 }

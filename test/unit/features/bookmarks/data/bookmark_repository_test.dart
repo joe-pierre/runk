@@ -17,6 +17,19 @@ class FakeBookmarkRemoteDatasource implements BookmarkRemoteDatasource {
   final List<Map<String, dynamic>> insertedRows = [];
   final List<String> updatedIds = [];
   final List<String> deletedIds = [];
+  final List<Map<String, dynamic>> upsertedRows = [];
+
+  /// Ordre chronologique de tous les appels (`insert:<id>`, `update:<id>`,
+  /// `delete:<id>`, `upsert:<id>`) — utilisé par `sync_service_test.dart`
+  /// pour vérifier que les suppressions en attente sont bien traitées avant
+  /// tout autre envoi (voir SPEC.md section 13).
+  final List<String> callOrder = [];
+
+  /// État actuel de la table distante simulée, indexé par `id` — permet de
+  /// représenter des lignes déjà présentes côté serveur (ex: créées par un
+  /// autre appareil) sans passer par `insert`/`upsert` de ce fake, pour
+  /// tester `BookmarkRepository.pullRemoteChanges`.
+  final Map<String, Map<String, dynamic>> remoteRows = {};
 
   /// Si vrai, chaque appel lève une exception — simule une absence de
   /// connexion réseau.
@@ -26,13 +39,15 @@ class FakeBookmarkRemoteDatasource implements BookmarkRemoteDatasource {
   Future<Map<String, dynamic>> insert(Map<String, dynamic> data) async {
     if (shouldFail) throw Exception('Réseau indisponible (simulation)');
     insertedRows.add(data);
+    remoteRows[data['id'] as String] = data;
+    callOrder.add('insert:${data['id']}');
     return data;
   }
 
   @override
   Future<List<Map<String, dynamic>>> selectAll() async {
     if (shouldFail) throw Exception('Réseau indisponible (simulation)');
-    return insertedRows;
+    return remoteRows.values.toList();
   }
 
   @override
@@ -42,6 +57,8 @@ class FakeBookmarkRemoteDatasource implements BookmarkRemoteDatasource {
   ) async {
     if (shouldFail) throw Exception('Réseau indisponible (simulation)');
     updatedIds.add(id);
+    remoteRows[id] = data;
+    callOrder.add('update:$id');
     return data;
   }
 
@@ -49,6 +66,16 @@ class FakeBookmarkRemoteDatasource implements BookmarkRemoteDatasource {
   Future<void> delete(String id) async {
     if (shouldFail) throw Exception('Réseau indisponible (simulation)');
     deletedIds.add(id);
+    remoteRows.remove(id);
+    callOrder.add('delete:$id');
+  }
+
+  @override
+  Future<void> upsert(Map<String, dynamic> data) async {
+    if (shouldFail) throw Exception('Réseau indisponible (simulation)');
+    upsertedRows.add(data);
+    remoteRows[data['id'] as String] = data;
+    callOrder.add('upsert:${data['id']}');
   }
 }
 
@@ -173,6 +200,209 @@ void main() {
       final bookmarks = await repository.getAllBookmarks();
       expect(bookmarks, hasLength(1));
       expect(bookmarks.single.id, created.id);
+    });
+  });
+
+  group('syncPendingChanges', () {
+    test(
+      'pousse via upsert une entité en attente appartenant à un utilisateur '
+      'authentifié, puis la marque isSynced',
+      () async {
+        final entity = BookmarkEntity()
+          ..remoteId = 'remote-1'
+          ..userId = 'user-1'
+          ..url = 'https://www.youtube.com/watch?v=abc'
+          ..title = 'Vidéo en attente'
+          ..source = VideoSource.youtube.name
+          ..tags = const []
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026)
+          ..isSynced = false
+          ..isDeletedLocally = false;
+        await localDatasource.upsert(entity);
+
+        await repository.syncPendingChanges();
+
+        expect(remoteDatasource.upsertedRows, hasLength(1));
+        expect(remoteDatasource.upsertedRows.single['id'], 'remote-1');
+        final synced = await localDatasource.findByRemoteId('remote-1');
+        expect(synced!.isSynced, isTrue);
+      },
+    );
+
+    test(
+      'ignore les entités sans utilisateur authentifié (userId == null)',
+      () async {
+        final entity = BookmarkEntity()
+          ..remoteId = 'remote-anon'
+          ..url = 'https://www.youtube.com/watch?v=xyz'
+          ..title = 'Anonyme'
+          ..source = VideoSource.youtube.name
+          ..tags = const []
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026)
+          ..isSynced = false
+          ..isDeletedLocally = false;
+        await localDatasource.upsert(entity);
+
+        await repository.syncPendingChanges();
+
+        expect(remoteDatasource.upsertedRows, isEmpty);
+      },
+    );
+
+    test(
+      'traite les suppressions en attente avant tout autre envoi '
+      '(voir SPEC.md section 13)',
+      () async {
+        final toDelete = BookmarkEntity()
+          ..remoteId = 'remote-delete'
+          ..userId = 'user-1'
+          ..url = 'https://www.youtube.com/watch?v=del'
+          ..title = 'À supprimer'
+          ..source = VideoSource.youtube.name
+          ..tags = const []
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026)
+          ..isSynced = true
+          ..isDeletedLocally = true;
+        final toUpload = BookmarkEntity()
+          ..remoteId = 'remote-upload'
+          ..userId = 'user-1'
+          ..url = 'https://www.youtube.com/watch?v=up'
+          ..title = 'À envoyer'
+          ..source = VideoSource.youtube.name
+          ..tags = const []
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026)
+          ..isSynced = false
+          ..isDeletedLocally = false;
+        await localDatasource.upsert(toDelete);
+        await localDatasource.upsert(toUpload);
+
+        await repository.syncPendingChanges();
+
+        expect(remoteDatasource.callOrder, [
+          'delete:remote-delete',
+          'upsert:remote-upload',
+        ]);
+        expect(await localDatasource.findByRemoteId('remote-delete'), isNull);
+      },
+    );
+  });
+
+  group('pullRemoteChanges', () {
+    test(
+      'rapatrie localement un bookmark créé sur un autre appareil',
+      () async {
+        remoteDatasource.remoteRows['remote-2'] = {
+          'id': 'remote-2',
+          'user_id': 'user-1',
+          'url': 'https://www.tiktok.com/@user/video/2',
+          'title': 'Créé ailleurs',
+          'thumbnail_url': null,
+          'source': VideoSource.tiktok.name,
+          'tags': ['depuis-second-appareil'],
+          'note': null,
+          'is_partial': false,
+          'created_at': DateTime(2026).toIso8601String(),
+          'updated_at': DateTime(2026).toIso8601String(),
+        };
+
+        await repository.pullRemoteChanges();
+
+        final bookmarks = await repository.getAllBookmarks();
+        expect(bookmarks, hasLength(1));
+        expect(bookmarks.single.id, 'remote-2');
+        expect(bookmarks.single.tags, ['depuis-second-appareil']);
+      },
+    );
+
+    test(
+      'une ligne distante plus récente écrase la copie locale '
+      '(last-write-wins, voir SPEC.md section 13)',
+      () async {
+        final localEntity = BookmarkEntity()
+          ..remoteId = 'remote-3'
+          ..userId = 'user-1'
+          ..url = 'https://www.youtube.com/watch?v=abc'
+          ..title = 'Ancien titre'
+          ..source = VideoSource.youtube.name
+          ..tags = const []
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026)
+          ..isSynced = true
+          ..isDeletedLocally = false;
+        await localDatasource.upsert(localEntity);
+
+        remoteDatasource.remoteRows['remote-3'] = {
+          'id': 'remote-3',
+          'user_id': 'user-1',
+          'url': 'https://www.youtube.com/watch?v=abc',
+          'title': 'Titre modifié ailleurs',
+          'thumbnail_url': null,
+          'source': VideoSource.youtube.name,
+          'tags': <String>[],
+          'note': null,
+          'is_partial': false,
+          'created_at': DateTime(2026).toIso8601String(),
+          'updated_at': DateTime(2026, 1, 2).toIso8601String(),
+        };
+
+        await repository.pullRemoteChanges();
+
+        final updated = await localDatasource.findByRemoteId('remote-3');
+        expect(updated!.title, 'Titre modifié ailleurs');
+      },
+    );
+
+    test(
+      'supprime localement un bookmark déjà synchronisé mais supprimé sur '
+      'un autre appareil',
+      () async {
+        final localEntity = BookmarkEntity()
+          ..remoteId = 'remote-4'
+          ..userId = 'user-1'
+          ..url = 'https://www.youtube.com/watch?v=gone'
+          ..title = 'Supprimé ailleurs'
+          ..source = VideoSource.youtube.name
+          ..tags = const []
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026)
+          ..isSynced = true
+          ..isDeletedLocally = false;
+        await localDatasource.upsert(localEntity);
+
+        await repository.pullRemoteChanges();
+
+        expect(await localDatasource.findByRemoteId('remote-4'), isNull);
+      },
+    );
+  });
+
+  group('searchBookmarks', () {
+    test('trouve un bookmark par titre ou par tag, jamais via le réseau', () async {
+      await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Recette de cuisine',
+        source: VideoSource.youtube,
+        tags: const ['cuisine'],
+      );
+      await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=xyz',
+        title: 'Tutoriel Flutter',
+        source: VideoSource.youtube,
+        tags: const ['dev'],
+      );
+
+      final byTitle = await repository.searchBookmarks('recette');
+      expect(byTitle.map((b) => b.title), ['Recette de cuisine']);
+
+      final byTag = await repository.searchBookmarks('dev');
+      expect(byTag.map((b) => b.title), ['Tutoriel Flutter']);
+
+      final noMatch = await repository.searchBookmarks('inexistant');
+      expect(noMatch, isEmpty);
     });
   });
 }

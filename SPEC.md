@@ -30,6 +30,7 @@ Fonctionnement cible :
 | Réception de partage | `receive_sharing_intent` | Gère Android Intent + iOS Share Extension avec une API unifiée |
 | Récupération de métadonnées | `http` + parsing manuel des balises `og:` + endpoints oEmbed officiels | Pas de solution tout-en-un fiable pour toutes les plateformes ciblées |
 | Ouverture de lien externe | `url_launcher` | Standard pour deep links + fallback navigateur |
+| Détection de connectivité | `connectivity_plus` | Déclenche une tentative de resynchronisation à la reconnexion réseau (voir section 13 et DECISIONS.md Tâche 9) — signale une interface réseau active, jamais une garantie d'accès Internet ni de session Supabase joignable ; le succès réel reste jugé par l'appel Supabase lui-même |
 
 ## 3. Modèle de données
 
@@ -122,13 +123,17 @@ class BookmarkEntity {
 lib/
 ├── main.dart
 ├── app/
-│   └── router.dart
+│   ├── router.dart
+│   └── app_shell.dart                               # bottom nav 3 onglets, voir section 11
 ├── features/
 │   ├── bookmarks/
 │   │   ├── data/
 │   │   │   ├── bookmark_repository.dart
 │   │   │   ├── bookmark_local_datasource.dart      # Isar
-│   │   │   └── bookmark_remote_datasource.dart     # Supabase
+│   │   │   ├── bookmark_remote_datasource.dart     # Supabase
+│   │   │   └── sync_service.dart                   # voir DECISIONS.md Tâche 9 : ici plutôt
+│   │   │                                            # que core/services/, pour ne pas faire
+│   │   │                                            # dépendre core/ de BookmarkRepository
 │   │   ├── domain/
 │   │   │   └── video_bookmark.dart
 │   │   └── presentation/
@@ -144,7 +149,6 @@ lib/
     │   ├── share_intent_service.dart
     │   ├── clipboard_service.dart
     │   ├── deep_link_service.dart
-    │   ├── sync_service.dart
     │   ├── supabase_service.dart
     │   └── metadata/
     │       ├── metadata_service.dart
