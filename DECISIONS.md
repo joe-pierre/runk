@@ -558,3 +558,21 @@ Index unique insensible à la casse pour rester cohérent avec la déduplication
 **Leçon :** avant de concevoir une opération "transaction unique" entre deux collections d'un même moteur de données, vérifier le support réel des transactions imbriquées dans le code source du package plutôt que de le supposer — Isar les interdit explicitement, ce qui a directement dicté l'architecture (instance unique partagée, composition manuelle de la transaction dans le repository) plutôt qu'une simple préférence de style.
 
 **Statut :** ✅ Résolu
+
+---
+
+## [RÉSOLU] Tâche 16 — Extraction d'URL depuis un texte de partage libre (bug partage TikTok Lite)
+
+**Contexte :** `ShareIntentService._isValidUrl` exigeait que l'intégralité de la chaîne partagée soit une URL valide. TikTok Lite partage un texte libre entourant le lien réel de texte promotionnel et d'un second lien non pertinent (ex: `"Check out Sarafina's video! #TikTok https://vm.tiktok.com/ZS4BB5Rc7/ This post is shared via TikTok Lite. Download TikTok Lite to enjoy more posts: https://www.tiktok.com/tiktoklite"`), ce qui faisait échouer la validation sur la chaîne entière — le partage était rejeté silencieusement, sans qu'aucune erreur ne soit visible pour l'utilisateur.
+
+**Symptôme / Problème :** bug constaté sur test manuel réel (partage depuis TikTok Lite). YouTube/Instagram partagent un lien nu (fonctionnaient déjà) ; TikTok Lite partage un texte libre avec parfois deux URLs, la seconde étant purement promotionnelle et sans rapport avec la vidéo partagée.
+
+**Cause / Alternatives :** (1) assouplir `_isValidUrl` pour accepter un texte contenant une URL en le validant tel quel (`Uri.tryParse` sur la chaîne entière échouerait toujours à cause du texte environnant) — ne résout rien ; (2) extraire toutes les sous-chaînes ressemblant à une URL `http`/`https` via une regex (`RegExp(r'https?://\S+')`), nettoyer la ponctuation finale parasite éventuellement collée (point, parenthèse fermante, etc.), puis choisir parmi les URLs valides trouvées celle dont `SourceDetector.detect` reconnaît une plateforme (≠ `VideoSource.unknown`) plutôt que la première de la liste — pour ne pas dépendre de la position du lien pertinent dans le texte. Si aucune URL trouvée ne correspond à une plateforme reconnue, la première URL valide est conservée malgré tout, cohérent avec le fait que `ShareIntentService` ne doit connaître aucune liste de plateformes en dur (seulement s'appuyer sur `SourceDetector`, déjà partagé par le reste du code).
+
+**Fix / Décision :** option 2. Nouvelle méthode privée `ShareIntentService._extractBestUrl(text)`, appelée par `_handleSharedMedia` avant `_isValidUrl`. Une chaîne déjà entièrement constituée d'une URL nue (cas YouTube/Instagram) traverse cette extraction sans changement de comportement — un seul candidat est trouvé, retourné tel quel. Aucune dépendance ajoutée (regex simple, pas de package de parsing).
+
+**Vérification :** nouveau test unitaire dans `share_intent_service_test.dart` reproduisant exactement le texte de partage TikTok Lite ci-dessus (avec les deux liens) — confirme qu'uniquement `https://vm.tiktok.com/ZS4BB5Rc7/` est émis sur `sharedUrlStream`. Test existant (URL nue, texte sans lien) inchangé et toujours vert. `flutter analyze` propre. `flutter test -j 1` : 109 passed, 2 skipped (préexistants, sans rapport, voir entrée Tâche 10).
+
+**Leçon :** un service qui valide une entrée partagée par un système tiers ne doit pas supposer que toute plateforme partage un lien nu — certaines apps (TikTok Lite) enrobent le lien de texte libre et de liens additionnels non pertinents ; extraire puis désambiguïser via la logique de détection déjà existante (`SourceDetector`) évite d'introduire une nouvelle dépendance à la liste des plateformes dans une couche qui ne doit pas la connaître.
+
+**Statut :** ✅ Résolu
