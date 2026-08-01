@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/video_source.dart';
@@ -82,6 +83,11 @@ class BookmarkCard extends StatelessWidget {
 
 /// Miniature du bookmark, ou placeholder si absente / [VideoBookmark.isPartial]
 /// (voir SPEC.md section 4 règle 3 — dégradation propre des métadonnées).
+///
+/// Le chargement passe par [CachedNetworkImage] (cache disque local à
+/// l'appareil, voir DECISIONS.md « Tâche 12 »), pour rester affichée même
+/// après un redémarrage de l'app si l'URL distante d'origine a expiré
+/// entre-temps (cas fréquent des CDN signés Instagram/Facebook).
 class _BookmarkThumbnail extends StatelessWidget {
   const _BookmarkThumbnail({required this.bookmark});
 
@@ -97,12 +103,12 @@ class _BookmarkThumbnail extends StatelessWidget {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        thumbnailUrl,
+      child: CachedNetworkImage(
+        imageUrl: thumbnailUrl,
         width: _size,
         height: _size,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
+        errorWidget: (context, url, error) =>
             _placeholder(context, icon: Icons.broken_image_outlined),
       ),
     );

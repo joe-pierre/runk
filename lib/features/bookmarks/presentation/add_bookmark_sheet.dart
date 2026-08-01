@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -160,6 +161,10 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
 /// haut de la modale, propre à l'aperçu avant sauvegarde — distinct du
 /// placeholder de `BookmarkCard`, qui affiche un `VideoBookmark` déjà
 /// persisté.
+///
+/// Le chargement passe par [CachedNetworkImage] (cache disque local à
+/// l'appareil, voir DECISIONS.md « Tâche 12 »), pour rester affichée même
+/// si l'URL distante d'origine expire par la suite.
 class _MetadataPreview extends StatelessWidget {
   const _MetadataPreview({required this.metadata});
 
@@ -187,12 +192,12 @@ class _MetadataPreview extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        thumbnailUrl,
+      child: CachedNetworkImage(
+        imageUrl: thumbnailUrl,
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
+        errorWidget: (context, url, error) => Container(
           height: height,
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: Icon(
