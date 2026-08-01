@@ -80,6 +80,7 @@
 - [ ] `SearchScreen` (recherche full-text titre + tags)
 - [ ] `SyncService` (synchronisation offline-first Isar ↔ Supabase, gestion `isSynced` / `isDeletedLocally`, exploite `BookmarkRemoteSyncException` pour différencier un vrai échec de sync d'une absence de session — voir DECISIONS.md Tâche 5)
 - [ ] Authentification utilisateur (Supabase Auth — email/password ou magic link) — doit aussi renseigner rétroactivement `BookmarkEntity.userId` sur les bookmarks déjà créés hors ligne (voir DECISIONS.md Tâche 5)
+- [x] Tâche 15 — Gestion indépendante des tags : collection Isar `TagEntity` (nom unique insensible à la casse), `TagRepository` (`lib/features/tags/data/`, créer/renommer/supprimer avec propagation en cascade vers `BookmarkEntity.tags` dans une transaction Isar unique), `TagsScreen` étendu (bouton d'ajout, menu contextuel renommer/supprimer avec confirmation affichant le nombre de bookmarks impactés), `distinctTagsProvider` fusionnant tags gérés et tags dérivés des bookmarks (voir `DECISIONS.md`, entrée "Tâche 15") — validation visuelle sur appareil physique restant à faire par l'utilisateur (voir `BUGS_AND_ROADMAP.md`)
 
 ## Phase 7 — Préparation au déploiement
 

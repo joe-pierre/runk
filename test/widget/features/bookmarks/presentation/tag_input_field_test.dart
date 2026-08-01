@@ -5,6 +5,8 @@ import 'package:runk/core/models/video_source.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/tag_input_field.dart';
+import 'package:runk/features/tags/data/tag_repository.dart';
+import 'package:runk/features/tags/data/tag_repository_provider.dart';
 
 /// Court-circuite `BookmarkRepository` pour alimenter `distinctTagsProvider`
 /// avec des tags fixes, comme `distinct_tags_provider_test.dart` (voir
@@ -16,6 +18,27 @@ class _FakeBookmarkList extends BookmarkList {
 
   @override
   Future<List<VideoBookmark>> build() async => _bookmarks;
+}
+
+/// Court-circuite `TagRepository` (donc Isar) — aucun tag géré dans ces
+/// tests, seuls les tags dérivés des bookmarks sont exercés (voir
+/// `distinct_tags_provider_test.dart`).
+class _FakeTagRepository implements TagRepository {
+  @override
+  Future<List<String>> getManagedTagNames() async => const [];
+
+  @override
+  Future<void> createTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<int> countBookmarksForTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> renameTag(String oldName, String newName) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> deleteTag(String name) => throw UnimplementedError();
 }
 
 VideoBookmark _bookmarkWithTags(List<String> tags) {
@@ -42,6 +65,7 @@ Future<void> _pumpTagInputField(
         bookmarkListProvider.overrideWith(
           () => _FakeBookmarkList([_bookmarkWithTags(existingTags)]),
         ),
+        tagRepositoryProvider.overrideWith((ref) async => _FakeTagRepository()),
       ],
       child: MaterialApp(
         home: Scaffold(

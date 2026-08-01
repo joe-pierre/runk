@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:runk/core/models/video_source.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
+import 'package:runk/features/tags/data/tag_repository.dart';
+import 'package:runk/features/tags/data/tag_repository_provider.dart';
 import 'package:runk/features/tags/presentation/distinct_tags_provider.dart';
 
 /// Court-circuite `BookmarkRepository` (donc Isar et Supabase), comme
@@ -15,6 +17,32 @@ class _FakeBookmarkList extends BookmarkList {
 
   @override
   Future<List<VideoBookmark>> build() async => _bookmarks;
+}
+
+/// Court-circuite `TagRepository` (donc Isar) avec une liste de tags gérés
+/// fixe — seul `getManagedTagNames` est exercé par `distinctTagsProvider`
+/// (voir DECISIONS.md, entrée « Tâche 15 »), les autres méthodes ne sont
+/// jamais appelées dans ces tests.
+class _FakeTagRepository implements TagRepository {
+  _FakeTagRepository([this._managedTagNames = const []]);
+
+  final List<String> _managedTagNames;
+
+  @override
+  Future<List<String>> getManagedTagNames() async => _managedTagNames;
+
+  @override
+  Future<void> createTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<int> countBookmarksForTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> renameTag(String oldName, String newName) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> deleteTag(String name) => throw UnimplementedError();
 }
 
 VideoBookmark _bookmark({required String id, required List<String> tags}) {
@@ -40,6 +68,7 @@ void main() {
             _bookmark(id: '3', tags: const []),
           ]),
         ),
+        tagRepositoryProvider.overrideWith((ref) async => _FakeTagRepository()),
       ],
     );
     addTearDown(container.dispose);
@@ -55,6 +84,7 @@ void main() {
         bookmarkListProvider.overrideWith(
           () => _FakeBookmarkList([_bookmark(id: '1', tags: const [])]),
         ),
+        tagRepositoryProvider.overrideWith((ref) async => _FakeTagRepository()),
       ],
     );
     addTearDown(container.dispose);
@@ -63,4 +93,49 @@ void main() {
 
     expect(tags, isEmpty);
   });
+
+  test(
+    'inclut un tag géré sans aucun bookmark associé (voir DECISIONS.md, '
+    'entrée « Tâche 15 »)',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(
+            () => _FakeBookmarkList([_bookmark(id: '1', tags: const ['dev'])]),
+          ),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(const ['sans-bookmark']),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final tags = await container.read(distinctTagsProvider.future);
+
+      expect(tags, ['dev', 'sans-bookmark']);
+    },
+  );
+
+  test(
+    'en cas de collision de casse, priorité d\'affichage au tag géré',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(
+            () => _FakeBookmarkList([
+              _bookmark(id: '1', tags: const ['cuisine']),
+            ]),
+          ),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(const ['Cuisine']),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final tags = await container.read(distinctTagsProvider.future);
+
+      expect(tags, ['Cuisine']);
+    },
+  );
 }

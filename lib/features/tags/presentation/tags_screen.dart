@@ -2,16 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../bookmarks/presentation/bookmark_list_provider.dart';
 import '../../bookmarks/presentation/bookmark_tag_filter_provider.dart';
+import '../data/tag_repository_provider.dart';
 import 'distinct_tags_provider.dart';
+import 'tag_action_dialogs.dart';
 
-/// Écran de navigation par tag (voir SPEC.md section 11).
+/// Action disponible sur un tag depuis son menu contextuel (voir
+/// [TagsScreen]).
+enum _TagAction { rename, delete }
+
+/// Écran de navigation par tag (voir SPEC.md section 11), étendu depuis la
+/// Tâche 15 à la gestion indépendante des tags (voir DECISIONS.md, entrée
+/// « Tâche 15 ») : créer un tag sans bookmark associé (bouton "+" de
+/// l'`AppBar`), le renommer ou le supprimer (menu contextuel par tag).
 ///
-/// Liste tous les tags distincts utilisés ([distinctTagsProvider]) ; un tap
-/// sur un tag active [bookmarkTagFilterProvider] puis retourne sur l'onglet
-/// Home, qui affiche alors les bookmarks filtrés en réutilisant `BookmarkCard`
-/// tel quel — cet écran ne duplique aucun affichage de bookmark (voir
-/// contrainte de la Tâche 9).
+/// Liste tous les tags fusionnés ([distinctTagsProvider]) ; un tap sur un
+/// tag active [bookmarkTagFilterProvider] puis retourne sur l'onglet Home,
+/// qui affiche alors les bookmarks filtrés en réutilisant `BookmarkCard` tel
+/// quel — cet écran ne duplique aucun affichage de bookmark (voir
+/// contrainte de la Tâche 9). Toute mutation passe exclusivement par
+/// `TagRepository` (voir CONVENTIONS.md section Réponses API).
 class TagsScreen extends ConsumerWidget {
   const TagsScreen({super.key});
 
@@ -20,7 +31,16 @@ class TagsScreen extends ConsumerWidget {
     final tagsAsync = ref.watch(distinctTagsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tags')),
+      appBar: AppBar(
+        title: const Text('Tags'),
+        actions: [
+          IconButton(
+            tooltip: 'Ajouter un tag',
+            icon: const Icon(Icons.add),
+            onPressed: () => _createTag(context, ref),
+          ),
+        ],
+      ),
       body: tagsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Center(
@@ -46,6 +66,23 @@ class TagsScreen extends ConsumerWidget {
                 leading: const Icon(Icons.label_outline),
                 title: Text(tag),
                 onTap: () => _filterHomeByTag(context, ref, tag),
+                trailing: PopupMenuButton<_TagAction>(
+                  tooltip: 'Actions sur ce tag',
+                  onSelected: (action) => switch (action) {
+                    _TagAction.rename => _renameTag(context, ref, tag),
+                    _TagAction.delete => _deleteTag(context, ref, tag),
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _TagAction.rename,
+                      child: Text('Renommer'),
+                    ),
+                    PopupMenuItem(
+                      value: _TagAction.delete,
+                      child: Text('Supprimer'),
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -57,5 +94,60 @@ class TagsScreen extends ConsumerWidget {
   void _filterHomeByTag(BuildContext context, WidgetRef ref, String tag) {
     ref.read(bookmarkTagFilterProvider.notifier).select(tag);
     context.go('/');
+  }
+
+  Future<void> _createTag(BuildContext context, WidgetRef ref) async {
+    final name = await promptForTagName(context, title: 'Ajouter un tag');
+    if (name == null || name.trim().isEmpty) return;
+
+    final tagRepository = await ref.read(tagRepositoryProvider.future);
+    await tagRepository.createTag(name);
+    await _refreshTagSources(ref);
+  }
+
+  Future<void> _renameTag(
+    BuildContext context,
+    WidgetRef ref,
+    String currentName,
+  ) async {
+    final newName = await promptForTagName(
+      context,
+      title: 'Renommer le tag',
+      initialValue: currentName,
+    );
+    if (newName == null || newName.trim().isEmpty) return;
+
+    final tagRepository = await ref.read(tagRepositoryProvider.future);
+    await tagRepository.renameTag(currentName, newName);
+    await _refreshTagSources(ref);
+  }
+
+  Future<void> _deleteTag(
+    BuildContext context,
+    WidgetRef ref,
+    String tag,
+  ) async {
+    final tagRepository = await ref.read(tagRepositoryProvider.future);
+    final impactedCount = await tagRepository.countBookmarksForTag(tag);
+
+    if (!context.mounted) return;
+    final confirmed = await confirmTagDeletion(
+      context,
+      tag: tag,
+      impactedCount: impactedCount,
+    );
+    if (confirmed != true) return;
+
+    await tagRepository.deleteTag(tag);
+    await _refreshTagSources(ref);
+  }
+
+  /// Recharge les deux sources affectées par une mutation de tag : la liste
+  /// fusionnée elle-même, et les bookmarks (dont les `tags` affichés par
+  /// `BookmarkCard` ont pu changer suite à un renommage/suppression en
+  /// cascade, voir DECISIONS.md « Tâche 15 »).
+  Future<void> _refreshTagSources(WidgetRef ref) async {
+    ref.invalidate(distinctTagsProvider);
+    await ref.read(bookmarkListProvider.notifier).refresh();
   }
 }

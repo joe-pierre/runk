@@ -484,3 +484,77 @@
 **Leçon :** un changement de libellé de bouton, même trivial en apparence, doit être recherché dans toute la base (`grep`) avant d'être considéré terminé — les tests d'intégration qui font `find.text(...)` sur un libellé UI cassent silencieusement sinon (ici détecté avant commit grâce à `flutter test integration_test`, pas après).
 
 **Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 15 — `TagEntity` : gestion indépendante des tags (proposition, questions ouvertes — Phase A, aucun code écrit)
+
+**Contexte :** besoin exprimé de pouvoir créer, renommer et supprimer un tag indépendamment de tout bookmark, depuis `TagsScreen`. Aujourd'hui un tag n'existe pas en tant qu'entité : `BookmarkEntity.tags` (SPEC.md section 3.3) est un simple `List<String>` porté par chaque bookmark, et `distinctTagsProvider` (`lib/features/tags/presentation/distinct_tags_provider.dart`) ne fait que dériver l'ensemble des tags distincts à partir de `bookmarkListProvider` — aucune source de vérité n'existe indépendamment des bookmarks. Il est donc structurellement impossible aujourd'hui qu'un tag existe sans être rattaché à au moins un bookmark, ce que la demande implique par construction (« créer un tag depuis `TagsScreen` sans aucun bookmark associé »).
+
+**Symptôme / Problème :** répondre au besoin exige d'introduire une nouvelle collection Isar (`TagEntity`), absente de SPEC.md section 3.3 — changement de modèle de données non trivial, avec trois points de comportement non tranchés par la demande elle-même. Conformément à la règle du projet (aucune ambiguïté n'est tranchée silencieusement), ces points sont documentés ici comme des **questions ouvertes**, pas comme des décisions déjà prises. Aucun fichier `.dart` n'a été modifié pour cette entrée, aucun commit n'a été fait.
+
+**Proposition de schéma (a minima, à valider) :**
+```dart
+@collection
+class TagEntity {
+  Id isarId = Isar.autoIncrement;
+  @Index(unique: true, caseSensitive: false)
+  late String name;
+}
+```
+Index unique insensible à la casse pour rester cohérent avec la déduplication déjà actée en Tâche 13 (`'Cuisine'`/`'cuisine'` traités comme un seul tag dans `TagInputField`).
+
+**Questions ouvertes :**
+
+1. **Suppression d'un tag — cascade ou non ?**
+   - Option A (cascade) : supprimer un `TagEntity` retire aussi ce tag de `BookmarkEntity.tags` sur tous les bookmarks qui l'utilisent (parcours + réécriture de chaque bookmark concerné, propagation potentielle vers Supabase via `isSynced = false`).
+   - Option B (non-cascade) : supprimer un `TagEntity` le retire uniquement de la liste de gestion (`TagsScreen`) ; les bookmarks existants gardent le tag tel quel dans leur `List<String>`, qui redeviendrait alors visible dans `distinctTagsProvider` dès qu'au moins un bookmark le porte encore (le tag « réapparaîtrait » de fait, dérivé des bookmarks, même après suppression de son `TagEntity`).
+   - Tension à trancher : l'option B rend le mot « supprimer » trompeur pour l'utilisateur (le tag reste visible et filtrable tant qu'un bookmark le porte) ; l'option A est plus intuitive mais touche potentiellement un grand nombre de bookmarks en une seule action et doit repasser par la synchronisation Supabase (coût, et risque vis-à-vis de la politique last-write-wins si un autre appareil modifie le même bookmark en parallèle, voir SPEC.md section 13).
+
+2. **Renommage d'un tag — propagation ou non dans `BookmarkEntity.tags` ?**
+   - Option A (propagation) : renommer un `TagEntity` met à jour `tags` sur tous les bookmarks qui le portent (remplacement de l'ancienne valeur par la nouvelle), avec les mêmes implications de coût/sync que la suppression en cascade ci-dessus.
+   - Option B (non-propagation) : renommer un `TagEntity` ne change que l'entité de gestion ; les bookmarks déjà tagués gardent l'ancien libellé, qui coexisterait alors comme un tag distinct dérivé (ancien nom) à côté du nouveau `TagEntity` (nouveau nom) dans l'autocomplétion.
+   - Tension à trancher : l'option B produit une divergence durable entre le nom « géré » et le nom réellement porté par les bookmarks existants (deux tags visuellement différents pour ce qui était censé être un renommage) ; symétrique de la question 1.
+
+3. **Fusion dans `distinctTagsProvider` (ou nouveau provider dédié) — comment éviter les doublons ?**
+   - Le provider actuel dérive uniquement des bookmarks. Il faudra fusionner cet ensemble avec les noms des `TagEntity` existants (y compris ceux sans aucun bookmark associé), en dédupliquant de façon insensible à la casse (cohérent avec Tâche 13) — mais quelle casse afficher en cas de divergence (ex. un `TagEntity.name = 'Cuisine'` et un bookmark taggé `'cuisine'`) ? Priorité au `TagEntity` géré, ou au tag le plus utilisé ?
+   - Question annexe : si les réponses aux questions 1 et 2 sont « non-propagation », un tag purement dérivé des bookmarks (sans `TagEntity` correspondant, ex. après un renommage non propagé) reste-t-il éditable/supprimable depuis `TagsScreen` comme s'il avait un `TagEntity` — ce qui impliquerait de le créer à la volée — ou seulement affiché en lecture seule ?
+
+**Fix / Décision :** les trois questions ont été tranchées par l'utilisateur : suppression en cascade, renommage propagé, tag dérivé éditable avec création implicite de son `TagEntity`. Voir l'entrée « Tâche 15 — Implémentation » ci-dessous pour le détail de la mise en œuvre.
+
+**Leçon :** poser les questions de modèle de données comme options explicites plutôt que de deviner un comportement "raisonnable" a permis de trancher les trois en une seule fois, sans aller-retour supplémentaire une fois la Phase B lancée.
+
+**Statut :** 🟡 Révisé — voir « Tâche 15 — Implémentation de la gestion indépendante des tags » ci-dessous. Entrée conservée pour l'historique des questions posées, ne pas supprimer.
+
+---
+
+## [RÉSOLU] Tâche 15 — Implémentation de la gestion indépendante des tags (`TagEntity`, `TagRepository`)
+
+**Contexte :** Phase B de la Tâche 15, suite à la décision actée ci-dessus. Branche `feat/standalone-tag-management`.
+
+**Décisions de modèle appliquées (rappel, actées par l'utilisateur en Phase A) :**
+- Suppression d'un tag = cascade : retire le tag de tous les `BookmarkEntity.tags` qui le portent, avec confirmation utilisateur affichant le nombre de bookmarks impactés.
+- Renommage d'un tag = propagation : met à jour tous les `BookmarkEntity.tags` concernés.
+- Un tag purement dérivé (aucun `TagEntity`) reste éditable comme un tag géré ; le renommer ou le supprimer depuis `TagsScreen` crée implicitement son `TagEntity` (renommage) ou l'ignore silencieusement (suppression, rien à retirer).
+- Fusion dans `distinctTagsProvider` : dédoublonnage insensible à la casse, priorité d'affichage à la casse du `TagEntity` géré s'il existe pour ce nom normalisé.
+
+**Symptôme / Problème technique rencontré :** la contrainte explicite de la tâche ("suppression/renommage dans une **même** transaction Isar, pas d'écriture en deux temps") s'est heurtée à une limite du package : Isar (`isar_community`) **interdit explicitement les transactions imbriquées** — `Zone.current[_zoneTxn]` est vérifié par `_requireNotInTxn()` (`isar_common.dart`), et un `writeTxn` appelé depuis l'intérieur d'un `writeTxn` déjà actif lève `IsarError: Isar does not support nesting transactions` (vérifié en lisant le code source du package dans `~/.pub-cache`, pas supposé). Or `BookmarkLocalDatasource.upsert`/`TagLocalDatasource.upsert` ouvrent chacun leur propre `writeTxn` — impossible de les composer tels quels dans une transaction unique couvrant les deux collections.
+
+**Cause / Alternatives :**
+1. Garder deux instances Isar séparées (une par feature, chacune dans son propre fichier) — écarté d'emblée : deux instances Isar ne peuvent jamais partager une transaction, ce qui aurait rendu l'atomicité demandée (suppression/renommage en une seule transaction) impossible par construction.
+2. Une seule instance Isar partagée (les deux schémas ouverts par le même `Isar.open`), et laisser `TagRepository` composer lui-même la transaction en appelant les collections Isar directement (`_isar.tagEntitys`/`_isar.bookmarkEntitys`) pour les méthodes `renameTag`/`deleteTag`, plutôt que par les méthodes d'écriture des datasources (qui restent utilisées pour les cas à collection unique : `createTag`, et pour toutes les lectures, qui elles n'ouvrent jamais de transaction et se composent sans problème — vérifié aussi dans le code source, `getTxn(false, ...)` réutilise la transaction active si elle existe déjà).
+
+**Fix / Décision :** option 2. Conséquences architecturales, documentées dans le code (voir doc de classe de `bookmarkIsarProvider` et de `TagRepository`) :
+- `bookmarkIsarProvider` (`lib/features/bookmarks/data/bookmark_repository_provider.dart`) ouvre désormais `[BookmarkEntitySchema, TagEntitySchema]` dans une seule instance, partagée par `bookmarkRepositoryProvider` et le nouveau `tagRepositoryProvider`. Reste dans `features/bookmarks/data/` plutôt que déplacé (pas de nouveau composant "composition root" introduit pour un seul point d'ouverture, même raisonnement que Tâche 6.5).
+- `TagRepository` reçoit l'instance `Isar` brute en plus de `TagLocalDatasource`/`BookmarkLocalDatasource`, uniquement pour composer la transaction unique de `renameTag`/`deleteTag` — les lectures (`findByName`, `findAllByTag`) restent déléguées aux datasources.
+- Dépendance croisée à double sens entre `features/bookmarks/data/` et `features/tags/data/` : `bookmark_repository_provider.dart` importe `TagEntitySchema` (pour l'ouverture combinée), `tag_repository_provider.dart`/`tag_repository.dart` importent `BookmarkLocalDatasource`/`BookmarkEntity` (pour la cascade). Direction jugée acceptable : symétrique à la dépendance déjà existante côté présentation (`distinct_tags_provider.dart` dépend de `bookmark_list_provider.dart` depuis la création de `TagsScreen`, Tâche 9) et sans alternative propre trouvée dans l'architecture actuelle (`core/` ne peut pas porter cette logique sans inverser la règle "`core/` ne dépend jamais d'une `feature/`", voir DECISIONS.md entrée Tâche 4).
+- `distinctTagsProvider` fusionne désormais `bookmarkListProvider` (tags dérivés) et `tagRepositoryProvider.getManagedTagNames()` (tags gérés), contrat public inchangé (`Future<List<String>>`) — `TagInputField`/l'autocomplétion de `AddBookmarkSheet` non modifiés.
+- `TagsScreen` : bouton "+" (`AppBar`), menu contextuel par tag (`PopupMenuButton`, "Renommer"/"Supprimer"), dialogues extraits dans `tag_action_dialogs.dart` (cohérent avec CONVENTIONS.md, pas de widget anonyme complexe inline). Après toute mutation, `distinctTagsProvider` est invalidé et `bookmarkListProvider.refresh()` est appelé (les tags affichés sur `BookmarkCard` peuvent changer suite à une cascade).
+
+**Vérification :** `flutter analyze` propre. `flutter test` : 108 passed, 2 skipped (préexistants, sans rapport, voir entrée Tâche 10) — nouveaux tests : `tag_repository_test.dart` (7 cas : création, doublon de casse en no-op, renommage propagé sur plusieurs bookmarks, renommage d'un tag purement dérivé avec création implicite du `TagEntity`, suppression en cascade, comptage des bookmarks impactés), extensions de `distinct_tags_provider_test.dart` (fusion, priorité de casse) et `tags_screen_test.dart` (création/renommage/suppression avec confirmation, via widget tests bout en bout sur `TagsScreen` réel). `flutter test integration_test -d linux` toujours vert (le flux Share Intent → Metadata → Save, qui passe par `AddBookmarkSheet`/`TagInputField`/`distinctTagsProvider`, continue de fonctionner avec l'instance Isar partagée). Application relancée via `flutter run -d linux` : démarrage propre, ouverture Isar avec les deux schémas sans erreur.
+
+**Écart signalé :** aucun appareil physique Android/iOS ni émulateur disponible dans cette session (limitation déjà documentée dans plusieurs entrées précédentes) — le rendu réel des dialogues de création/renommage/suppression et du menu contextuel sur petit écran reste à valider visuellement par l'utilisateur.
+
+**Leçon :** avant de concevoir une opération "transaction unique" entre deux collections d'un même moteur de données, vérifier le support réel des transactions imbriquées dans le code source du package plutôt que de le supposer — Isar les interdit explicitement, ce qui a directement dicté l'architecture (instance unique partagée, composition manuelle de la transaction dans le repository) plutôt qu'une simple préférence de style.
+
+**Statut :** ✅ Résolu
