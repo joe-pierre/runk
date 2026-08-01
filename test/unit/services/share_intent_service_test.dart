@@ -44,5 +44,41 @@ void main() {
         service.dispose();
       },
     );
+
+    test(
+      "extrait le lien TikTok pertinent d'un texte de partage TikTok Lite "
+      'contenant un second lien promotionnel non pertinent',
+      () async {
+        final mediaStreamController =
+            StreamController<List<SharedMediaFile>>();
+        ReceiveSharingIntent.setMockValues(
+          initialMedia: const [],
+          mediaStream: mediaStreamController.stream,
+        );
+
+        final service = ShareIntentService();
+        final emittedUrls = <String>[];
+        service.sharedUrlStream.listen(emittedUrls.add);
+
+        await service.initialize();
+
+        mediaStreamController.add(<SharedMediaFile>[
+          SharedMediaFile(
+            path: "Check out Sarafina's video! #TikTok "
+                'https://vm.tiktok.com/ZS4BB5Rc7/ This post is shared via '
+                'TikTok Lite. Download TikTok Lite to enjoy more posts: '
+                'https://www.tiktok.com/tiktoklite',
+            type: SharedMediaType.text,
+          ),
+        ]);
+
+        await Future<void>.delayed(Duration.zero);
+
+        expect(emittedUrls, <String>['https://vm.tiktok.com/ZS4BB5Rc7/']);
+
+        await mediaStreamController.close();
+        service.dispose();
+      },
+    );
   });
 }
