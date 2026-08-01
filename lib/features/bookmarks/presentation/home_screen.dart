@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'bookmark_card.dart';
+import 'bookmark_context_menu.dart';
 import 'bookmark_list_provider.dart';
 import 'bookmark_tag_filter_provider.dart';
 import 'clipboard_suggestion_banner.dart';
@@ -29,6 +30,10 @@ import 'open_bookmark_action.dart';
 /// Le bouton flottant "+" ouvre `ManualAddDialog`, troisième voie d'entrée
 /// d'un bookmark équivalente au Share Intent et à la suggestion clipboard
 /// (voir SPEC.md section 11).
+///
+/// Un appui long sur une carte délègue à `showBookmarkContextMenu` (Tâche
+/// 21) l'ouverture du menu contextuel (modifier les tags / supprimer) —
+/// geste distinct du tap simple, sans interférence (voir `BookmarkCard`).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -92,6 +97,8 @@ class HomeScreen extends ConsumerWidget {
                         child: BookmarkCard(
                           bookmark: bookmark,
                           onTap: () => openBookmark(context, ref, bookmark),
+                          onLongPress: () =>
+                              showBookmarkContextMenu(context, ref, bookmark),
                         ),
                       );
                     },

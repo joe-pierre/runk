@@ -12,10 +12,19 @@ import '../domain/video_bookmark.dart';
 /// récupérer une métadonnée (voir CONVENTIONS.md section Partials /
 /// Frontend). [onTap] est branché par `HomeScreen` sur
 /// `DeepLinkService.openInSource` (Tâche 8) — laissé optionnel ici, ce
-/// widget ne connaît lui-même aucune logique de réouverture.
+/// widget ne connaît lui-même aucune logique de réouverture. [onLongPress]
+/// suit le même principe (Tâche 21) : branché par `HomeScreen` sur
+/// `showBookmarkContextMenu`, jamais d'appel direct à `BookmarkRepository`
+/// depuis ce fichier.
 class BookmarkCard extends StatelessWidget {
-  /// Crée la carte pour [bookmark]. [onTap] est appelé au tap sur la carte.
-  const BookmarkCard({super.key, required this.bookmark, this.onTap});
+  /// Crée la carte pour [bookmark]. [onTap] est appelé au tap sur la carte,
+  /// [onLongPress] à l'appui long.
+  const BookmarkCard({
+    super.key,
+    required this.bookmark,
+    this.onTap,
+    this.onLongPress,
+  });
 
   /// Bookmark à afficher.
   final VideoBookmark bookmark;
@@ -23,12 +32,18 @@ class BookmarkCard extends StatelessWidget {
   /// Appelé au tap sur la carte, ou `null` si aucune action n'est branchée.
   final VoidCallback? onTap;
 
+  /// Appelé à l'appui long sur la carte, ou `null` si aucune action n'est
+  /// branchée. Geste distinct du tap simple (`onTap`) — `InkWell` gère
+  /// nativement la désambiguïsation entre les deux, aucune interférence.
+  final VoidCallback? onLongPress;
+
   @override
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
