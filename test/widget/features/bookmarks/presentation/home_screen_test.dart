@@ -9,6 +9,7 @@ import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart
 import 'package:runk/features/bookmarks/presentation/bookmark_tag_filter_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
 import 'package:runk/features/bookmarks/presentation/manual_add_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Notifier de test qui court-circuite `BookmarkRepository` (donc Isar et
@@ -160,6 +161,67 @@ void main() {
 
       expect(container.read(bookmarkTagFilterProvider), isNull);
       expect(find.text('Vidéo dev'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un bookmark isHidden: true n\'apparaît pas dans la liste (Tâche 22)',
+    (tester) async {
+      final visible = VideoBookmark(
+        id: '1',
+        url: 'https://youtube.com/watch?v=abc',
+        title: 'Vidéo visible',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      final hidden = VideoBookmark(
+        id: '2',
+        url: 'https://youtube.com/watch?v=xyz',
+        title: 'Vidéo masquée',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        isHidden: true,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(
+              () => _FakeBookmarkList([visible, hidden]),
+            ),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vidéo visible'), findsOneWidget);
+      expect(find.text('Vidéo masquée'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'un appui long sur "Runk" sans code défini propose d\'en créer un '
+    '(Tâche 22)',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Runk'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Définir un code'), findsOneWidget);
     },
   );
 

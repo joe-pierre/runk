@@ -203,6 +203,95 @@ void main() {
     });
   });
 
+  group('isHidden (Tâche 22 — My Eyes Only)', () {
+    test('un bookmark créé est isHidden: false par défaut', () async {
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Vidéo',
+        source: VideoSource.youtube,
+      );
+
+      expect(created.isHidden, isFalse);
+    });
+
+    test(
+      'updateBookmark persiste isHidden: true, et il est bien restitué par '
+      'getAllBookmarks',
+      () async {
+        final created = await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Vidéo',
+          source: VideoSource.youtube,
+        );
+
+        await repository.updateBookmark(created.copyWith(isHidden: true));
+
+        final bookmarks = await repository.getAllBookmarks();
+        expect(bookmarks.single.isHidden, isTrue);
+      },
+    );
+
+    test(
+      'unhideAllBookmarks démasque tous les bookmarks masqués sans toucher '
+      'aux autres, ni les supprimer',
+      () async {
+        final hidden = await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=hidden',
+          title: 'Masqué',
+          source: VideoSource.youtube,
+        );
+        final visible = await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=visible',
+          title: 'Visible',
+          source: VideoSource.youtube,
+        );
+        await repository.updateBookmark(hidden.copyWith(isHidden: true));
+
+        await repository.unhideAllBookmarks();
+
+        final bookmarks = await repository.getAllBookmarks();
+        expect(bookmarks, hasLength(2));
+        expect(bookmarks.every((bookmark) => !bookmark.isHidden), isTrue);
+        expect(
+          bookmarks.map((bookmark) => bookmark.id),
+          containsAll([hidden.id, visible.id]),
+        );
+      },
+    );
+
+    test(
+      'is_hidden est bien mappé vers/depuis la ligne distante Supabase',
+      () async {
+        final created = await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Vidéo',
+          source: VideoSource.youtube,
+        );
+        await repository.updateBookmark(created.copyWith(isHidden: true));
+
+        remoteDatasource.remoteRows['remote-hidden'] = {
+          'id': 'remote-hidden',
+          'user_id': 'user-1',
+          'url': 'https://www.youtube.com/watch?v=xyz',
+          'title': 'Depuis un autre appareil',
+          'thumbnail_url': null,
+          'source': VideoSource.youtube.name,
+          'tags': <String>[],
+          'note': null,
+          'is_partial': false,
+          'is_hidden': true,
+          'created_at': DateTime(2026).toIso8601String(),
+          'updated_at': DateTime(2026).toIso8601String(),
+        };
+        await repository.pullRemoteChanges();
+
+        final bookmarks = await repository.getAllBookmarks();
+        final pulled = bookmarks.firstWhere((b) => b.id == 'remote-hidden');
+        expect(pulled.isHidden, isTrue);
+      },
+    );
+  });
+
   group('syncPendingChanges', () {
     test(
       'pousse via upsert une entité en attente appartenant à un utilisateur '

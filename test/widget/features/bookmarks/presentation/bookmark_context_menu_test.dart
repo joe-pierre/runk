@@ -145,7 +145,7 @@ void main() {
   }
 
   testWidgets(
-    'un appui long sur une carte ouvre le menu avec ses deux actions',
+    'un appui long sur une carte ouvre le menu avec ses trois actions',
     (tester) async {
       await tester.runAsync(() async {
         await repository.createBookmark(
@@ -161,7 +161,47 @@ void main() {
         await pumpFrames(tester);
 
         expect(find.text('Modifier les tags'), findsOneWidget);
+        expect(find.text('Masquer'), findsOneWidget);
         expect(find.text('Supprimer'), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets(
+    '"Masquer" (Tâche 22) retire immédiatement le bookmark de HomeScreen, '
+    'et le menu propose ensuite "Ne plus masquer"',
+    (tester) async {
+      await tester.runAsync(() async {
+        await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Ma vidéo',
+          source: VideoSource.youtube,
+        );
+
+        await pumpHomeScreen(tester);
+        await pumpFrames(tester);
+
+        await longPressUnderRunAsync(tester, find.text('Ma vidéo'));
+        await pumpFrames(tester);
+        await tester.tap(find.text('Masquer'));
+        await pumpFrames(tester);
+
+        List<VideoBookmark> updated;
+        var attempts = 0;
+        do {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          updated = await repository.getAllBookmarks();
+          attempts++;
+        } while (!updated.single.isHidden && attempts < 100);
+        expect(updated.single.isHidden, isTrue);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        await container.read(bookmarkListProvider.notifier).refresh();
+        await pumpFrames(tester);
+
+        expect(find.text('Ma vidéo'), findsNothing);
       });
     },
   );

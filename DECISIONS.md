@@ -683,3 +683,43 @@ Index unique insensible à la casse pour rester cohérent avec la déduplication
 2. `tester.longPress()` s'appuie en interne sur l'avancement de l'horloge *fake* du test pour déclencher le minuteur du `LongPressGestureRecognizer` (`kLongPressTimeout`) — cette horloge étant court-circuitée par `runAsync`, le geste dégénère en simple tap (`onTap`/`openBookmark` se déclenchait à la place du menu). Remplacé par une simulation manuelle (`startGesture` + vraie attente réelle > 500 ms + `up()`).
 3. `tester.pump()` **sans** argument de durée n'avance jamais l'horloge synthétique de frame de `TestWidgetsFlutterBinding` : une transition de route reste figée à sa valeur initiale (complètement hors écran) quel que soit le nombre d'appels — une `Duration` explicite (`tester.pump(duration)`) est indispensable pour la faire progresser, y compris à l'intérieur de `runAsync`.
 **Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 22 — Section "My Eyes Only" : décisions actées en amont avec l'utilisateur
+
+**Contexte :** nouvelle fonctionnalité de masquage de bookmarks, protégée par un code local. Trois points ont été tranchés avec l'utilisateur avant tout développement (voir `TASK_PROMPTS.md`), documentés ici pour mémoire plutôt que retranchés :
+1. **Point d'entrée volontairement discret :** appui long sur le titre "Runk" de l'`AppBar` de `HomeScreen` (`GestureDetector` autour du `Text`, voir `home_screen.dart`) — aucun onglet dédié dans `AppShell`, aucune route `go_router` associée (voir entrée séparée ci-dessous sur `Navigator.push`).
+2. **"Code oublié ?" ne bloque jamais l'utilisateur :** démasque tous les bookmarks `isHidden: true` existants (`BookmarkRepository.unhideAllBookmarks`, aucune suppression) et efface le hash du code (`MyEyesOnlyService.resetPin`), puis enchaîne automatiquement sur le dialogue de création d'un nouveau code (confirmé explicitement par l'utilisateur : pas besoin de refaire l'appui long sur "Runk").
+3. **Synchronisation asymétrique :** `VideoBookmark.isHidden`/`BookmarkEntity.isHidden` suit exactement le même chemin que les autres champs (`_toRemoteMap`/`_fromRemoteMap` de `BookmarkRepository`, colonne `bookmarks.is_hidden` côté Supabase) — visible sur un second appareil après synchronisation. Le code PIN lui-même (`MyEyesOnlyService`) ne connaît que `shared_preferences`, jamais Isar ni Supabase : strictement local à chaque appareil.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 22 — Limite de sécurité assumée : confidentialité d'usage, pas chiffrement
+
+**Contexte :** le code "My Eyes Only" protège l'accès à une liste de bookmarks depuis l'interface de l'app, pas les données elles-mêmes.
+**Ce qui est réellement protégé :** un utilisateur qui n'a pas le code ne peut pas, *depuis l'app*, faire apparaître les bookmarks `isHidden: true` dans `HomeScreen` ni dans `MyEyesOnlyScreen`.
+**Ce qui n'est pas protégé :** les bookmarks masqués restent en clair dans la base Isar locale (accessible à quiconque a un accès root/débogage à l'appareil) et dans la table `bookmarks` de Supabase, où ils sont seulement protégés par les policies RLS déjà en place pour tout bookmark (donc invisibles aux *autres utilisateurs* de l'app, mais pas chiffrés pour le propriétaire lui-même — un accès direct à la base Supabase avec les identifiants du compte, ou à l'Isar local du device, les révèle sans le code).
+**Décision :** assumer cette limite plutôt que de concevoir un chiffrement au repos (hors périmètre de la Tâche 22, complexité et gestion de clé disproportionnées pour le besoin exprimé — masquer par confort d'usage, pas se protéger d'un accès root/forensique à l'appareil). Formulée explicitement dans le commentaire `///` de `MyEyesOnlyService` (`lib/core/services/my_eyes_only_service.dart`) pour qu'elle reste visible à la prochaine personne qui referait confiance à cette fonctionnalité pour un usage plus sensible.
+**Leçon :** nommer clairement la limite d'une fonctionnalité de confidentialité dès sa livraison évite qu'elle soit perçue plus tard comme un bug de sécurité plutôt que comme un choix assumé.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 22 — `MyEyesOnlyScreen` ouvert via `Navigator.push`, pas une route `go_router`
+
+**Contexte :** `router.dart` déclare aujourd'hui uniquement les 3 branches visibles de la bottom navigation (Home/Tags/Recherche, voir Tâche 9) au sein d'un unique `StatefulShellRoute.indexedStack`. `MyEyesOnlyScreen` doit rester un point d'entrée discret (voir décision ci-dessus), jamais accessible autrement qu'en passant par le code.
+**Alternatives envisagées :** (1) ajouter une route `go_router` dédiée (ex: `/my-eyes-only`), cohérente avec le reste de la navigation de l'app ; (2) ouvrir l'écran via un simple `Navigator.of(context).push(MaterialPageRoute(...))`, en dehors de toute configuration `go_router`.
+**Décision :** option 2. Une route `go_router` nommée serait adressable directement (deep link, bouton "retour" du système reconstruisant l'URL, historique de navigation persistant) — au moins un chemin d'accès à l'écran qui contournerait entièrement le code, ce qui contredirait le point d'entrée volontairement discret déjà acté avec l'utilisateur. `Navigator.push` classique n'existe que le temps où l'utilisateur est effectivement passé par `openMyEyesOnly` (donc par le code), et disparaît de la pile de navigation dès qu'il revient en arrière.
+**Conséquence :** `MyEyesOnlyScreen` n'apparaît dans aucun fichier de routes ; `my_eyes_only_access.dart` est le seul point d'entrée qui la construit.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 22 — Réutilisation de `showBookmarkContextMenu` (donc "Ne plus masquer") depuis `MyEyesOnlyScreen`
+
+**Contexte :** le prompt de tâche demandait que `MyEyesOnlyScreen` réutilise `BookmarkCard` filtré sur `isHidden == true`, sans préciser si le menu contextuel par appui long (Tâche 21, `onLongPress`) devait lui aussi y être branché.
+**Décision :** brancher `onLongPress`/`showBookmarkContextMenu` sur `MyEyesOnlyScreen` exactement comme sur `HomeScreen` (même signature, même widget), plutôt que de le laisser non câblé comme cela avait été fait pour `SearchScreen` en Tâche 21 (voir entrée « Tâche 21 » ci-dessus, "Portée volontairement limitée à `HomeScreen`"). Sans ce branchement, un bookmark masqué par erreur ne pourrait être "démasqué" qu'en repassant par `HomeScreen`... où il n'apparaît justement plus — seul `MyEyesOnlyScreen` peut raisonnablement offrir cette action de retour, ce qui en fait une conséquence directe du critère d'acceptation de la tâche plutôt qu'un ajout hors périmètre.
+**Conséquence :** aucune duplication de code — `bookmark_context_menu.dart` est appelé tel quel, seul le libellé de l'action ("Masquer"/"Ne plus masquer") change dynamiquement selon `bookmark.isHidden`, déjà géré par le widget existant.
+**Statut :** 🔵 Choix assumé

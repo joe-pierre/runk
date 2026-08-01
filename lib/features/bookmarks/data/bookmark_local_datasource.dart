@@ -28,6 +28,11 @@ class BookmarkEntity {
   String? thumbnailUrl;
   late String source;
   bool isPartial = false;
+
+  /// Vrai si ce bookmark est masqué dans la section "My Eyes Only" (Tâche
+  /// 22, voir DECISIONS.md) — synchronisé avec Supabase comme les autres
+  /// champs, contrairement au code d'accès local (`MyEyesOnlyService`).
+  bool isHidden = false;
   List<String> tags = [];
   String? note;
   late DateTime createdAt;

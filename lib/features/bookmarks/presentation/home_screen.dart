@@ -7,10 +7,13 @@ import 'bookmark_list_provider.dart';
 import 'bookmark_tag_filter_provider.dart';
 import 'clipboard_suggestion_banner.dart';
 import 'manual_add_dialog.dart';
+import 'my_eyes_only_access.dart';
 import 'open_bookmark_action.dart';
 
 /// Écran d'accueil : liste chronologique (date de création décroissante) de
-/// tous les bookmarks non supprimés (voir SPEC.md section 11).
+/// tous les bookmarks non supprimés et non masqués (voir SPEC.md section
+/// 11) — un bookmark `isHidden: true` (voir Tâche 22, DECISIONS.md)
+/// disparaît immédiatement de cette liste, sans être supprimé.
 ///
 /// Purement présentationnel : lit [bookmarkListProvider] et affiche l'état
 /// correspondant (chargement, erreur, liste), ne décide jamais lui-même
@@ -32,8 +35,14 @@ import 'open_bookmark_action.dart';
 /// (voir SPEC.md section 11).
 ///
 /// Un appui long sur une carte délègue à `showBookmarkContextMenu` (Tâche
-/// 21) l'ouverture du menu contextuel (modifier les tags / supprimer) —
-/// geste distinct du tap simple, sans interférence (voir `BookmarkCard`).
+/// 21) l'ouverture du menu contextuel (modifier les tags / masquer /
+/// supprimer) — geste distinct du tap simple, sans interférence (voir
+/// `BookmarkCard`).
+///
+/// Un appui long sur le titre "Runk" de l'`AppBar` délègue à
+/// `openMyEyesOnly` (Tâche 22, voir DECISIONS.md) l'ouverture de la section
+/// de bookmarks masqués, protégée par un code — point d'entrée
+/// volontairement discret, sans onglet dédié dans `AppShell`.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -43,7 +52,12 @@ class HomeScreen extends ConsumerWidget {
     final tagFilter = ref.watch(bookmarkTagFilterProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Runk')),
+      appBar: AppBar(
+        title: GestureDetector(
+          onLongPress: () => openMyEyesOnly(context, ref),
+          child: const Text('Runk'),
+        ),
+      ),
       body: Column(
         children: [
           const ClipboardSuggestionBanner(),
@@ -69,9 +83,12 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               data: (allBookmarks) {
+                final visibleBookmarks = allBookmarks
+                    .where((bookmark) => !bookmark.isHidden)
+                    .toList();
                 final bookmarks = tagFilter == null
-                    ? allBookmarks
-                    : allBookmarks
+                    ? visibleBookmarks
+                    : visibleBookmarks
                           .where((bookmark) => bookmark.tags.contains(tagFilter))
                           .toList();
                 if (bookmarks.isEmpty) {
