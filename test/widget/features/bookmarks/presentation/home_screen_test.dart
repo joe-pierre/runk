@@ -8,6 +8,7 @@ import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_tag_filter_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
+import 'package:runk/features/bookmarks/presentation/manual_add_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Notifier de test qui court-circuite `BookmarkRepository` (donc Isar et
@@ -159,6 +160,26 @@ void main() {
 
       expect(container.read(bookmarkTagFilterProvider), isNull);
       expect(find.text('Vidéo dev'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un tap sur le bouton flottant "+" ouvre ManualAddDialog',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ManualAddDialog), findsOneWidget);
     },
   );
 }
