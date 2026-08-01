@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../models/video_source.dart';
 import '../utils/source_detector.dart';
+import '../utils/url_text_extractor.dart';
 import 'clipboard_history_store.dart';
 
 /// Détecte un lien vidéo copié dans le presse-papier et le propose à
@@ -14,8 +15,11 @@ import 'clipboard_history_store.dart';
 /// Observe le cycle de vie de l'application via [WidgetsBindingObserver] :
 /// la lecture du presse-papier n'a lieu **que** sur la transition vers
 /// [AppLifecycleState.resumed], jamais en tâche de fond, jamais via un
-/// timer périodique. Réutilise [SourceDetector] pour valider le contenu ;
-/// ignore silencieusement toute chaîne qui n'est pas une URL vidéo reconnue.
+/// timer périodique. Réutilise [UrlTextExtractor] pour extraire un lien
+/// exploitable d'un texte libre (ex: TikTok Lite entoure le lien copié de
+/// texte promotionnel, voir TASK_PROMPTS.md Tâche 18) puis [SourceDetector]
+/// pour valider la plateforme ; ignore silencieusement toute chaîne qui
+/// n'aboutit à aucune URL vidéo reconnue.
 ///
 /// Limitation documentée (voir SPEC.md section 9 et DECISIONS.md, entrée
 /// "Tâche 6.5") : sur iOS, l'API native `UIPasteboard.detectPatterns`
@@ -62,25 +66,15 @@ class ClipboardService with WidgetsBindingObserver {
 
   Future<void> _checkClipboard() async {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    final candidate = clipboardData?.text?.trim();
-    if (candidate == null || candidate.isEmpty) return;
-    if (!_isValidUrl(candidate)) return;
+    final text = clipboardData?.text?.trim();
+    if (text == null || text.isEmpty) return;
+
+    final candidate = UrlTextExtractor.extractBestUrl(text);
+    if (candidate == null) return;
     if (SourceDetector.detect(candidate) == VideoSource.unknown) return;
     if (await _historyStore.hasBeenSeen(candidate)) return;
 
     _suggestedUrlController.add(candidate);
-  }
-
-  /// Valide qu'une chaîne lue du presse-papier est bien une URL exploitable
-  /// : schéma `http`/`https` obligatoire et hôte non vide. Mêmes règles que
-  /// `ShareIntentService._isValidUrl`, dupliquées volontairement ici plutôt
-  /// que factorisées : deux occurrences courtes ne justifient pas encore un
-  /// utilitaire partagé (voir BUGS_AND_ROADMAP.md si une 3e apparaît).
-  bool _isValidUrl(String value) {
-    final uri = Uri.tryParse(value);
-    if (uri == null) return false;
-    return (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
   }
 
   /// Marque [url] comme vue dans l'historique, pour qu'elle ne soit plus

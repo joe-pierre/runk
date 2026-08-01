@@ -56,6 +56,7 @@
 - [x] Mémorisation des liens clipboard déjà proposés/ignorés (pour ne jamais les reproposer) — `ClipboardHistoryStore` via `SharedPreferences`
 - [x] `ClipboardSuggestionBanner` (UI de suggestion non bloquante sur `HomeScreen`)
 - [x] Vérification de priorité Share Intent > suggestion clipboard en cas de simultanéité (voir `SPEC.md` section 13) — `shareIntentProcessingProvider`, alimenté par `ShareIntentGate`
+- [x] Tâche 18 — Extraction d'URL depuis un texte de presse-papier (`ClipboardService._checkClipboard`) : corrige le même bug que la Tâche 16 (TikTok Lite copie un texte libre entourant le lien réel), désormais aussi rencontré côté clipboard ; logique d'extraction factorisée dans un nouvel utilitaire partagé `UrlTextExtractor` (`lib/core/utils/url_text_extractor.dart`), réutilisé par `ShareIntentService` (Tâche 16, comportement observable inchangé) et `ClipboardService`, sans nouvelle dépendance (voir `DECISIONS.md`, entrée "Tâche 18")
 - [ ] Test manuel sur appareil physique iOS 16+ ET iOS < 16 (voir `guide.md` section 5.4) — non réalisable dans cet environnement de développement (pas de matériel iOS), reste à faire par l'utilisateur. `detectPatterns` non implémenté (voir `DECISIONS.md`, entrée "Tâche 6.5") : la bannière système iOS est attendue sur toutes les versions.
 
 ## Phase 5 — Extension aux plateformes restantes

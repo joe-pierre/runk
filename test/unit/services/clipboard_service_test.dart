@@ -108,6 +108,28 @@ void main() {
       },
     );
 
+    test(
+      "propose le lien TikTok pertinent d'un texte de presse-papier TikTok "
+      'Lite contenant un second lien promotionnel non pertinent',
+      () async {
+        final service = await buildService();
+        final suggestions = <String>[];
+        service.suggestedUrlStream.listen(suggestions.add);
+
+        _mockClipboardValue(
+          "Check out Sarafina's video! #TikTok "
+          'https://vm.tiktok.com/ZS4BB5Rc7/ This post is shared via '
+          'TikTok Lite. Download TikTok Lite to enjoy more posts: '
+          'https://www.tiktok.com/tiktoklite',
+        );
+        service.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await pumpEventQueue();
+
+        expect(suggestions, ['https://vm.tiktok.com/ZS4BB5Rc7/']);
+        service.dispose();
+      },
+    );
+
     test('markAsSeen empêche toute nouvelle proposition du même lien', () async {
       final service = await buildService();
       final suggestions = <String>[];
