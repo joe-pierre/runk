@@ -112,10 +112,10 @@ void main() {
       // La modale d'ajout s'est ouverte, pré-remplie (URL de domaine
       // inconnu : GenericFallbackProvider répond sans aucun appel réseau,
       // voir DECISIONS.md Tâche 7).
-      expect(find.text('Enregistrer'), findsOneWidget);
+      expect(find.text('Ajouter'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Titre'), findsOneWidget);
 
-      await tester.tap(find.text('Enregistrer'));
+      await tester.tap(find.text('Ajouter'));
       await tester.pumpAndSettle();
 
       // La sauvegarde a créé une entrée dans le repository...
@@ -124,7 +124,7 @@ void main() {
       expect(savedBookmarks.single.url, sharedUrl);
 
       // ...et HomeScreen affiche le nouveau bookmark, modale refermée.
-      expect(find.text('Enregistrer'), findsNothing);
+      expect(find.text('Ajouter'), findsNothing);
       expect(find.text(savedBookmarks.single.title), findsOneWidget);
     },
   );

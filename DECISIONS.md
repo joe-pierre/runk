@@ -463,3 +463,24 @@
 **Leçon :** quand un critère d'acceptation décrit un comportement (« liste de tags en cours de saisie », dédoublonnage) incompatible avec le modèle de données actuel d'un champ (texte brut séparé par virgules), ne pas forcer ce comportement par-dessus l'ancien modèle — vérifier si la tâche implique un changement de représentation sous-jacente avant d'implémenter, et l'extraire dans son propre composant plutôt que d'alourdir le widget appelant.
 
 **Statut :** ✅ Résolu
+
+---
+
+## [RÉSOLU] Tâche 14 — Boutons de confirmation explicites (ajout de lien / ajout de tag)
+
+**Contexte :** retour de test manuel — le libellé "Enregistrer" du bouton principal d'`AddBookmarkSheet` était incohérent avec le libellé "Ajouter" déjà utilisé pour la même action (ajouter un lien) dans `clipboard_suggestion_banner.dart`, et la validation d'un tag tapé manuellement dans `TagInputField` (Tâche 13) ne disposait que de la soumission clavier (`onSubmitted`), sans affordance visuelle explicite.
+
+**Symptôme / Problème :** vocabulaire incohérent pour la même action selon le point d'entrée (bannière clipboard vs modale d'ajout), et absence de bouton visible pour valider un tag — seule la touche "Terminé"/Entrée du clavier le permettait, non découvrable sans essai.
+
+**Fix / Décision :**
+- `add_bookmark_sheet.dart` : libellé du `FilledButton.icon` de sauvegarde changé de `'Enregistrer'` à `'Ajouter'`, aucun changement de comportement (toujours `_save`, toujours désactivé pendant `_isSaving`).
+- `tag_input_field.dart` : le `TextField` de saisie de tag est désormais dans un `Row`, accompagné d'un `IconButton.filled` (icône `Icons.add`, tooltip "Ajouter ce tag") qui appelle `_addTag(_controller.text)` — exactement la même méthode que `onSubmitted`, donc même règle de déduplication insensible à la casse et même vidage du champ après ajout. Ce bouton ne manipule que l'état local `_tags` de `_AddBookmarkSheetState` (remonté via `onTagsChanged`) — aucune persistance avant la sauvegarde finale du bookmark via `BookmarkRepository`, conformément à la contrainte de la tâche.
+- `integration_test/app_flow_test.dart` : occurrences de `'Enregistrer'` mises à jour vers `'Ajouter'` pour rester cohérentes avec le nouveau libellé.
+
+**Alternatives envisagées :** un simple `Icon(Icons.add)` sans fond (`IconButton` standard) plutôt que `IconButton.filled` — écarté au profit de la variante remplie, plus proche visuellement d'une action de validation explicite (cohérent avec le critère d'acceptation « bouton "+" ») qu'une icône discrète pouvant se confondre avec une simple décoration.
+
+**Écart signalé :** le prompt ne précisait pas explicitement s'il fallait mettre à jour `integration_test/app_flow_test.dart` (qui référençait l'ancien libellé `'Enregistrer'`) — mis à jour pour éviter une régression de test non liée au périmètre fonctionnel de la tâche, mais strictement mécanique (renommage du texte cherché).
+
+**Leçon :** un changement de libellé de bouton, même trivial en apparence, doit être recherché dans toute la base (`grep`) avant d'être considéré terminé — les tests d'intégration qui font `find.text(...)` sur un libellé UI cassent silencieusement sinon (ici détecté avant commit grâce à `flutter test integration_test`, pas après).
+
+**Statut :** ✅ Résolu
