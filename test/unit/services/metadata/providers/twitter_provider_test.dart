@@ -32,7 +32,6 @@ void main() {
       );
 
       expect(metadata.title, 'Post de Jean Dupont sur X');
-      expect(metadata.thumbnailUrl, isNull);
       expect(metadata.source, VideoSource.twitter);
       expect(metadata.isPartial, isFalse);
     });
@@ -48,5 +47,61 @@ void main() {
         throwsA(isA<http.ClientException>()),
       );
     });
+
+    test(
+      'fetchMetadata renseigne thumbnailUrl si la page du post expose une balise og:image',
+      () async {
+        final mockClient = MockClient((request) async {
+          if (request.url.host == 'publish.twitter.com') {
+            return http.Response(
+              '{"author_name": "Jean Dupont", "html": "<blockquote></blockquote>"}',
+              200,
+            );
+          }
+          return http.Response(
+            '<html><head>'
+            '<meta property="og:image" content="https://pbs.twimg.com/media/abc.jpg">'
+            '</head></html>',
+            200,
+          );
+        });
+        final provider = TwitterProvider(httpClient: mockClient);
+
+        final metadata = await provider.fetchMetadata(
+          'https://x.com/i/status/2083336273922765201',
+        );
+
+        expect(metadata.title, 'Post de Jean Dupont sur X');
+        expect(metadata.thumbnailUrl, 'https://pbs.twimg.com/media/abc.jpg');
+        expect(metadata.source, VideoSource.twitter);
+        expect(metadata.isPartial, isFalse);
+      },
+    );
+
+    test(
+      'fetchMetadata laisse thumbnailUrl à null sans exception si le scraping og:image échoue '
+      '(post texte seul, page bloquée par X)',
+      () async {
+        final mockClient = MockClient((request) async {
+          if (request.url.host == 'publish.twitter.com') {
+            return http.Response(
+              '{"author_name": "Jean Dupont", "html": "<blockquote></blockquote>"}',
+              200,
+            );
+          }
+          return http.Response('<html><head></head></html>', 200);
+        });
+        final provider = TwitterProvider(httpClient: mockClient);
+
+        final metadata = await provider.fetchMetadata(
+          'https://twitter.com/user/status/456',
+        );
+
+        expect(metadata.title, 'Post de Jean Dupont sur X');
+        expect(metadata.thumbnailUrl, isNull);
+        expect(metadata.source, VideoSource.twitter);
+        expect(metadata.isPartial, isFalse);
+      },
+    );
   });
 }

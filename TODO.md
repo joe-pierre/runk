@@ -60,7 +60,7 @@
 
 ## Phase 5 — Extension aux plateformes restantes
 
-- [x] `TwitterProvider` (oEmbed officiel `publish.twitter.com` — titre basé sur `author_name`, pas de miniature native, voir `DECISIONS.md` Tâche 7)
+- [x] `TwitterProvider` (oEmbed officiel `publish.twitter.com` — titre basé sur `author_name`) — Tâche 17 : miniature best-effort ajoutée via scraping `og:image` complémentaire (`OgTagScraper`, timeout dédié 2s), échec silencieux inchangé (`thumbnailUrl: null`, `isPartial: false`), voir `DECISIONS.md` Tâche 17 (remplace le choix initial de la Tâche 7)
 - [x] `InstagramProvider` (scraping `og:` tags via `OgTagScraper` partagé, fallback interne vers `isPartial: true`, aucune exception ne remonte)
 - [x] `FacebookProvider` (idem Instagram — `is_partial` fréquent et attendu, pas un bug)
 - [x] `ThreadsProvider` (idem Instagram/Facebook — `is_partial` fréquent et attendu, pas un bug)
