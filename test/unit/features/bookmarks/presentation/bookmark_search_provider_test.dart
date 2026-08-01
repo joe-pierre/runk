@@ -64,4 +64,28 @@ void main() {
 
     expect(results.map((b) => b.title), ['Recette de cuisine']);
   });
+
+  test(
+    'exclut un bookmark "My Eyes Only" des résultats, même sans code saisi '
+    'dans la session',
+    () async {
+      final bookmark = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=hidden',
+        title: 'Recette secrète',
+        source: VideoSource.youtube,
+        tags: const ['secret'],
+      );
+      await repository.updateBookmark(bookmark.copyWith(isHidden: true));
+
+      final resultsByTitle = await container.read(
+        bookmarkSearchProvider('recette').future,
+      );
+      final resultsByTag = await container.read(
+        bookmarkSearchProvider('secret').future,
+      );
+
+      expect(resultsByTitle, isEmpty);
+      expect(resultsByTag, isEmpty);
+    },
+  );
 }

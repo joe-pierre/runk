@@ -144,10 +144,19 @@ class BookmarkLocalDatasource {
   /// section 11 — écran Recherche) : aucune requête réseau, la donnée locale
   /// est la seule source consultée. Insensible à la casse, résultats triés
   /// par date de création décroissante.
+  ///
+  /// Exclut systématiquement les entités `isHidden: true` (section "My Eyes
+  /// Only", Tâche 22) — la recherche n'a aucune raison légitime de faire
+  /// remonter un bookmark masqué, y compris si aucun code n'a encore été
+  /// saisi dans la session (voir DECISIONS.md, entrée "Tâche 23"). Ce filtre
+  /// n'est pas paramétrable depuis l'appelant : aucun bookmark masqué ne doit
+  /// pouvoir être retrouvé via cette méthode.
   Future<List<BookmarkEntity>> searchByTitleOrTags(String query) {
     return _isar.bookmarkEntitys
         .filter()
         .isDeletedLocallyEqualTo(false)
+        .and()
+        .isHiddenEqualTo(false)
         .and()
         .group(
           (filterBuilder) => filterBuilder

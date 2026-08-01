@@ -34,6 +34,7 @@ void main() {
     String? userId,
     bool isSynced = false,
     bool isDeletedLocally = false,
+    bool isHidden = false,
     String title = 'Titre',
     List<String> tags = const [],
   }) {
@@ -44,6 +45,7 @@ void main() {
       ..title = title
       ..source = VideoSource.youtube.name
       ..tags = tags
+      ..isHidden = isHidden
       ..createdAt = DateTime(2026)
       ..updatedAt = DateTime(2026)
       ..isSynced = isSynced
@@ -125,6 +127,23 @@ void main() {
       final results = await datasource.searchByTitleOrTags('recette');
 
       expect(results, isEmpty);
+    });
+
+    test('exclut les bookmarks masqués (My Eyes Only)', () async {
+      await datasource.upsert(
+        entity(
+          remoteId: 'a',
+          title: 'Recette secrète',
+          tags: const ['secret'],
+          isHidden: true,
+        ),
+      );
+
+      final resultsByTitle = await datasource.searchByTitleOrTags('recette');
+      final resultsByTag = await datasource.searchByTitleOrTags('secret');
+
+      expect(resultsByTitle, isEmpty);
+      expect(resultsByTag, isEmpty);
     });
   });
 }
