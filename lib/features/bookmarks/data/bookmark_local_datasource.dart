@@ -120,6 +120,21 @@ class BookmarkLocalDatasource {
     return entities.map((entity) => entity.remoteId).toList();
   }
 
+  /// Retourne tous les bookmarks actifs portant [tagName] (comparaison
+  /// insensible à la casse) — utilisé par `TagRepository` (voir DECISIONS.md,
+  /// entrée « Tâche 15 ») pour compter/lister les bookmarks impactés par un
+  /// renommage ou une suppression de tag. Lecture pure (aucune transaction
+  /// d'écriture ouverte) : peut être appelée depuis l'intérieur d'une
+  /// transaction déjà active sur la même instance [Isar].
+  Future<List<BookmarkEntity>> findAllByTag(String tagName) {
+    return _isar.bookmarkEntitys
+        .filter()
+        .isDeletedLocallyEqualTo(false)
+        .and()
+        .tagsElementEqualTo(tagName, caseSensitive: false)
+        .findAll();
+  }
+
   /// Recherche full-text locale sur le titre ou les tags (voir SPEC.md
   /// section 11 — écran Recherche) : aucune requête réseau, la donnée locale
   /// est la seule source consultée. Insensible à la casse, résultats triés

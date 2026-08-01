@@ -8,22 +8,46 @@ part of 'distinct_tags_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Expose la liste des tags distincts utilisés par tous les bookmarks, triés
-/// par ordre alphabétique (voir SPEC.md section 11 — écran Tags).
+/// Expose la liste fusionnée des tags distincts, triés par ordre
+/// alphabétique insensible à la casse (voir SPEC.md section 11 — écran
+/// Tags).
 ///
-/// Dérivé de [bookmarkListProvider] : ne fait aucun accès propre à
-/// `BookmarkRepository`, pour ne jamais dupliquer la source de vérité des
-/// bookmarks (voir CONVENTIONS.md section Partials / Frontend).
+/// Fusionne deux sources (voir DECISIONS.md, entrée « Tâche 15 ») :
+/// - les tags **dérivés** de [bookmarkListProvider] (portés par au moins un
+///   bookmark, comme avant la Tâche 15) ;
+/// - les tags **gérés** via `TagRepository` (un `TagEntity` peut exister
+///   sans aucun bookmark associé).
+///
+/// Déduplication insensible à la casse (cohérent avec `TagInputField`,
+/// DECISIONS.md entrée « Tâche 13 ») ; en cas de collision, la casse
+/// affichée est celle du tag **géré** quand il existe pour ce nom normalisé
+/// (décision actée en Phase A de la Tâche 15) — un tag purement dérivé sans
+/// `TagEntity` correspondant garde sa casse telle que tapée dans un
+/// bookmark. Ne fait aucun accès propre à Isar : délègue entièrement à
+/// [bookmarkListProvider] et [tagRepositoryProvider] (voir CONVENTIONS.md
+/// section Partials / Frontend).
 
 @ProviderFor(distinctTags)
 final distinctTagsProvider = DistinctTagsProvider._();
 
-/// Expose la liste des tags distincts utilisés par tous les bookmarks, triés
-/// par ordre alphabétique (voir SPEC.md section 11 — écran Tags).
+/// Expose la liste fusionnée des tags distincts, triés par ordre
+/// alphabétique insensible à la casse (voir SPEC.md section 11 — écran
+/// Tags).
 ///
-/// Dérivé de [bookmarkListProvider] : ne fait aucun accès propre à
-/// `BookmarkRepository`, pour ne jamais dupliquer la source de vérité des
-/// bookmarks (voir CONVENTIONS.md section Partials / Frontend).
+/// Fusionne deux sources (voir DECISIONS.md, entrée « Tâche 15 ») :
+/// - les tags **dérivés** de [bookmarkListProvider] (portés par au moins un
+///   bookmark, comme avant la Tâche 15) ;
+/// - les tags **gérés** via `TagRepository` (un `TagEntity` peut exister
+///   sans aucun bookmark associé).
+///
+/// Déduplication insensible à la casse (cohérent avec `TagInputField`,
+/// DECISIONS.md entrée « Tâche 13 ») ; en cas de collision, la casse
+/// affichée est celle du tag **géré** quand il existe pour ce nom normalisé
+/// (décision actée en Phase A de la Tâche 15) — un tag purement dérivé sans
+/// `TagEntity` correspondant garde sa casse telle que tapée dans un
+/// bookmark. Ne fait aucun accès propre à Isar : délègue entièrement à
+/// [bookmarkListProvider] et [tagRepositoryProvider] (voir CONVENTIONS.md
+/// section Partials / Frontend).
 
 final class DistinctTagsProvider
     extends
@@ -33,12 +57,24 @@ final class DistinctTagsProvider
           FutureOr<List<String>>
         >
     with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
-  /// Expose la liste des tags distincts utilisés par tous les bookmarks, triés
-  /// par ordre alphabétique (voir SPEC.md section 11 — écran Tags).
+  /// Expose la liste fusionnée des tags distincts, triés par ordre
+  /// alphabétique insensible à la casse (voir SPEC.md section 11 — écran
+  /// Tags).
   ///
-  /// Dérivé de [bookmarkListProvider] : ne fait aucun accès propre à
-  /// `BookmarkRepository`, pour ne jamais dupliquer la source de vérité des
-  /// bookmarks (voir CONVENTIONS.md section Partials / Frontend).
+  /// Fusionne deux sources (voir DECISIONS.md, entrée « Tâche 15 ») :
+  /// - les tags **dérivés** de [bookmarkListProvider] (portés par au moins un
+  ///   bookmark, comme avant la Tâche 15) ;
+  /// - les tags **gérés** via `TagRepository` (un `TagEntity` peut exister
+  ///   sans aucun bookmark associé).
+  ///
+  /// Déduplication insensible à la casse (cohérent avec `TagInputField`,
+  /// DECISIONS.md entrée « Tâche 13 ») ; en cas de collision, la casse
+  /// affichée est celle du tag **géré** quand il existe pour ce nom normalisé
+  /// (décision actée en Phase A de la Tâche 15) — un tag purement dérivé sans
+  /// `TagEntity` correspondant garde sa casse telle que tapée dans un
+  /// bookmark. Ne fait aucun accès propre à Isar : délègue entièrement à
+  /// [bookmarkListProvider] et [tagRepositoryProvider] (voir CONVENTIONS.md
+  /// section Partials / Frontend).
   DistinctTagsProvider._()
     : super(
         from: null,
@@ -65,4 +101,4 @@ final class DistinctTagsProvider
   }
 }
 
-String _$distinctTagsHash() => r'78e448f360ee80e7a4c7f62153a6d687cfb48ff4';
+String _$distinctTagsHash() => r'f343e4f2a35ecc6eccd11bdf95a476d51ee36d12';

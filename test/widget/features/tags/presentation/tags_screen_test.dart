@@ -6,10 +6,18 @@ import 'package:runk/core/models/video_source.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_tag_filter_provider.dart';
+import 'package:runk/features/tags/data/tag_repository.dart';
+import 'package:runk/features/tags/data/tag_repository_provider.dart';
 import 'package:runk/features/tags/presentation/tags_screen.dart';
 
 /// Court-circuite `BookmarkRepository`, comme dans
 /// `distinct_tags_provider_test.dart` (voir CONVENTIONS.md section Tests).
+///
+/// [refresh] est également court-circuité (contrairement à
+/// `_FakeBookmarkList` des autres fichiers de test) : `TagsScreen` l'appelle
+/// après chaque mutation de tag (voir `_refreshTagSources`), et la version
+/// héritée de `BookmarkList.refresh()` appellerait `bookmarkRepositoryProvider`
+/// réel (Isar via `path_provider`, indisponible dans ces tests).
 class _FakeBookmarkList extends BookmarkList {
   _FakeBookmarkList(this._bookmarks);
 
@@ -17,6 +25,63 @@ class _FakeBookmarkList extends BookmarkList {
 
   @override
   Future<List<VideoBookmark>> build() async => _bookmarks;
+
+  @override
+  Future<void> refresh() async {
+    state = AsyncData(_bookmarks);
+  }
+}
+
+/// Court-circuite `TagRepository` (donc Isar) avec un état géré en mémoire —
+/// suffisant pour vérifier que `TagsScreen` répercute bien les mutations
+/// dans la liste affichée (voir critère d'acceptation de la Tâche 15), sans
+/// re-tester la logique de cascade elle-même (déjà couverte par
+/// `tag_repository_test.dart`).
+class _FakeTagRepository implements TagRepository {
+  _FakeTagRepository(List<String> initialTagNames)
+    : _tagNames = List.of(initialTagNames);
+
+  final List<String> _tagNames;
+
+  /// Valeur retournée par [countBookmarksForTag], réglable par le test.
+  int countForNextDeletion = 0;
+
+  @override
+  Future<List<String>> getManagedTagNames() async => List.of(_tagNames);
+
+  @override
+  Future<void> createTag(String name) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) return;
+    final alreadyExists = _tagNames.any(
+      (existing) => existing.toLowerCase() == trimmedName.toLowerCase(),
+    );
+    if (!alreadyExists) _tagNames.add(trimmedName);
+  }
+
+  @override
+  Future<int> countBookmarksForTag(String name) async => countForNextDeletion;
+
+  @override
+  Future<void> renameTag(String oldName, String newName) async {
+    final trimmedNewName = newName.trim();
+    if (trimmedNewName.isEmpty) return;
+    final index = _tagNames.indexWhere(
+      (existing) => existing.toLowerCase() == oldName.toLowerCase(),
+    );
+    if (index >= 0) {
+      _tagNames[index] = trimmedNewName;
+    } else {
+      _tagNames.add(trimmedNewName);
+    }
+  }
+
+  @override
+  Future<void> deleteTag(String name) async {
+    _tagNames.removeWhere(
+      (existing) => existing.toLowerCase() == name.toLowerCase(),
+    );
+  }
 }
 
 void main() {
@@ -42,6 +107,9 @@ void main() {
         overrides: [
           bookmarkListProvider.overrideWith(
             () => _FakeBookmarkList([bookmark]),
+          ),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(const []),
           ),
         ],
       );
@@ -81,6 +149,9 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+        tagRepositoryProvider.overrideWith(
+          (ref) async => _FakeTagRepository(const []),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -98,4 +169,118 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'le bouton d\'ajout crée un tag géré, visible immédiatement sans '
+    'aucun bookmark associé',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(
+            () => _FakeBookmarkList(const []),
+          ),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(const []),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: TagsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('randonnée'), findsNothing);
+
+      await tester.tap(find.byTooltip('Ajouter un tag'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'randonnée');
+      await tester.tap(find.text('Valider'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('randonnée'), findsOneWidget);
+    },
+  );
+
+  testWidgets('renommer un tag met à jour son libellé affiché', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+        tagRepositoryProvider.overrideWith(
+          (ref) async => _FakeTagRepository(const ['cuisine']),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TagsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Actions sur ce tag'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Renommer'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'gastronomie');
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('cuisine'), findsNothing);
+    expect(find.text('gastronomie'), findsOneWidget);
+  });
+
+  testWidgets(
+    'supprimer un tag demande confirmation avec le nombre de bookmarks '
+    'impactés puis le retire de la liste',
+    (tester) async {
+      final fakeTagRepository = _FakeTagRepository(const ['cuisine'])
+        ..countForNextDeletion = 2;
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(
+            () => _FakeBookmarkList(const []),
+          ),
+          tagRepositoryProvider.overrideWith((ref) async => fakeTagRepository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: TagsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Actions sur ce tag'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Ce tag est utilisé par 2 bookmarks. Le supprimer le retirera '
+          'de tous ces bookmarks. Continuer ?',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('cuisine'), findsNothing);
+    },
+  );
 }
