@@ -48,6 +48,7 @@
 - [x] `BookmarkRepository` + `BookmarkLocalDatasource` (Isar) + `BookmarkRemoteDatasource` (Supabase)
 - [x] Branchement Riverpod : ouverture réelle d'Isar + `ProviderScope` dans `main.dart` (jusqu'ici seulement fait en test, voir DECISIONS.md Tâche 6)
 - [x] Branchement du Share Intent au widget racine (`ShareIntentGate`) + file d'attente pour partages multiples rapides (SPEC.md section 13)
+- [x] Tâche 20 — Bouton flottant "+" (`HomeScreen`), troisième voie d'entrée déjà prévue par SPEC.md section 11 : nouveau `ManualAddDialog` (`lib/features/bookmarks/presentation/manual_add_dialog.dart`), popup légère qui capte une URL tapée/collée, la valide en réutilisant `UrlTextExtractor.extractBestUrl` (utilitaire déjà factorisé Tâche 18, aucune nouvelle logique de validation), affiche une erreur inline si invalide, puis délègue à `AddBookmarkSheet.show` telle quelle — aucune duplication de la récupération de métadonnées (voir `DECISIONS.md`, entrée "Tâche 20")
 - [ ] Flux complet de bout en bout testé **sur appareil physique** : partage → metadata → sauvegarde → affichage dans Home persistant après redémarrage (vérifié en local : `flutter analyze`/`flutter test`/`flutter build apk --debug` OK, run sur `linux` desktop sans crash — reste à valider sur device réel, voir `BUGS_AND_ROADMAP.md`)
 
 ## Phase 4.5 — Détection de lien vidéo via clipboard

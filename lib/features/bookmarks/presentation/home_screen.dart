@@ -5,6 +5,7 @@ import 'bookmark_card.dart';
 import 'bookmark_list_provider.dart';
 import 'bookmark_tag_filter_provider.dart';
 import 'clipboard_suggestion_banner.dart';
+import 'manual_add_dialog.dart';
 import 'open_bookmark_action.dart';
 
 /// Écran d'accueil : liste chronologique (date de création décroissante) de
@@ -24,6 +25,10 @@ import 'open_bookmark_action.dart';
 /// la liste sur ce tag et affiche un chip permettant de retirer le filtre —
 /// `BookmarkCard` reste le seul widget d'affichage d'un bookmark, aucune
 /// duplication (voir contrainte de la Tâche 9).
+///
+/// Le bouton flottant "+" ouvre `ManualAddDialog`, troisième voie d'entrée
+/// d'un bookmark équivalente au Share Intent et à la suggestion clipboard
+/// (voir SPEC.md section 11).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -96,6 +101,10 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => ManualAddDialog.show(context),
+        child: const Icon(Icons.add),
       ),
     );
   }
