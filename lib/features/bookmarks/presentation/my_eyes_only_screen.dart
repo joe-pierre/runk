@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'add_to_my_eyes_only_screen.dart';
 import 'bookmark_card.dart';
-import 'bookmark_context_menu.dart';
 import 'bookmark_list_provider.dart';
+import 'hidden_bookmark_menu_button.dart';
 import 'open_bookmark_action.dart';
 
 /// Écran "My Eyes Only" (Tâche 22, voir DECISIONS.md) : liste des bookmarks
@@ -13,10 +14,15 @@ import 'open_bookmark_action.dart';
 /// Dérivé de [bookmarkListProvider] et filtré côté client, exactement comme
 /// le fait déjà `HomeScreen` pour le filtre par tag (voir CONVENTIONS.md,
 /// contrainte de la Tâche 9) : aucun nouvel accès direct à Isar/Supabase,
-/// `BookmarkCard` reste le seul widget d'affichage d'un bookmark. Le menu
-/// contextuel (`showBookmarkContextMenu`) reste disponible ici, ce qui
-/// permet notamment de "Ne plus masquer" un bookmark directement depuis
-/// cet écran.
+/// `BookmarkCard` reste le seul widget d'affichage d'un bookmark.
+///
+/// Depuis la Tâche 24 (voir DECISIONS.md, ajustement de la Tâche 22), le
+/// menu contextuel partagé (`showBookmarkContextMenu`) n'est plus branché
+/// ici : il ne doit plus jamais exposer la moindre trace du masquage, dans
+/// aucun écran. "Ne plus masquer" et "Supprimer" sont désormais proposés
+/// par [HiddenBookmarkMenuButton], une action locale dédiée à cet écran. Le
+/// bouton flottant "+" ouvre `AddToMyEyesOnlyScreen`, qui permet de masquer
+/// de nouveaux bookmarks par sélection multiple.
 class MyEyesOnlyScreen extends ConsumerWidget {
   const MyEyesOnlyScreen({super.key});
 
@@ -53,16 +59,27 @@ class MyEyesOnlyScreen extends ConsumerWidget {
               final bookmark = hiddenBookmarks[index];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: BookmarkCard(
-                  bookmark: bookmark,
-                  onTap: () => openBookmark(context, ref, bookmark),
-                  onLongPress: () =>
-                      showBookmarkContextMenu(context, ref, bookmark),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: BookmarkCard(
+                        bookmark: bookmark,
+                        onTap: () => openBookmark(context, ref, bookmark),
+                      ),
+                    ),
+                    HiddenBookmarkMenuButton(bookmark: bookmark),
+                  ],
                 ),
               );
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AddToMyEyesOnlyScreen()),
+        ),
+        child: const Icon(Icons.add),
       ),
     );
   }

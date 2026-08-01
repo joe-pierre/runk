@@ -8,12 +8,18 @@ import 'tag_input_field.dart';
 
 /// Actions proposées par le menu contextuel d'un bookmark (voir
 /// [showBookmarkContextMenu]).
-enum _BookmarkMenuAction { editTags, toggleHidden, delete }
+enum _BookmarkMenuAction { editTags, delete }
 
 /// Affiche le menu contextuel d'un [bookmark] (déclenché par un appui long
-/// sur une `BookmarkCard`, voir Tâche 21) : "Modifier les tags",
-/// "Masquer"/"Ne plus masquer" (Tâche 22, voir DECISIONS.md) et
+/// sur une `BookmarkCard`, voir Tâche 21) : "Modifier les tags" et
 /// "Supprimer".
+///
+/// Ce menu partagé (`HomeScreen`, `SearchScreen`, `TagsScreen`,
+/// `MyEyesOnlyScreen`) ne doit **jamais**, dans aucun état de l'app, exposer
+/// quoi que ce soit lié au masquage "My Eyes Only" — même pas pour un
+/// bookmark déjà masqué (Tâche 24, ajustement explicite de la Tâche 22, voir
+/// DECISIONS.md). Démasquer un bookmark n'est possible que depuis l'action
+/// locale dédiée de `MyEyesOnlyScreen` (`hidden_bookmark_menu_button.dart`).
 ///
 /// Porte toute la logique de mutation (appels à `bookmarkRepositoryProvider`
 /// puis rafraîchissement de [bookmarkListProvider]) — `BookmarkCard` reste
@@ -39,17 +45,6 @@ Future<void> showBookmarkContextMenu(
                 Navigator.of(sheetContext).pop(_BookmarkMenuAction.editTags),
           ),
           ListTile(
-            leading: Icon(
-              bookmark.isHidden
-                  ? Icons.visibility_outlined
-                  : Icons.visibility_off_outlined,
-            ),
-            title: Text(bookmark.isHidden ? 'Ne plus masquer' : 'Masquer'),
-            onTap: () => Navigator.of(
-              sheetContext,
-            ).pop(_BookmarkMenuAction.toggleHidden),
-          ),
-          ListTile(
             leading: const Icon(Icons.delete_outline),
             title: const Text('Supprimer'),
             onTap: () =>
@@ -65,23 +60,9 @@ Future<void> showBookmarkContextMenu(
   switch (action) {
     case _BookmarkMenuAction.editTags:
       await _editTags(context, ref, bookmark);
-    case _BookmarkMenuAction.toggleHidden:
-      await _toggleHidden(ref, bookmark);
     case _BookmarkMenuAction.delete:
       await _delete(context, ref, bookmark);
   }
-}
-
-/// Inverse `VideoBookmark.isHidden` via `BookmarkRepository.updateBookmark`
-/// (Tâche 22, voir DECISIONS.md) — masquer un bookmark le fait immédiatement
-/// disparaître de `HomeScreen` (filtrée sur `isHidden == false`), sans
-/// jamais le supprimer.
-Future<void> _toggleHidden(WidgetRef ref, VideoBookmark bookmark) async {
-  final repository = await ref.read(bookmarkRepositoryProvider.future);
-  await repository.updateBookmark(
-    bookmark.copyWith(isHidden: !bookmark.isHidden),
-  );
-  await ref.read(bookmarkListProvider.notifier).refresh();
 }
 
 /// Ouvre un dialogue réutilisant [TagInputField] pré-rempli avec les tags

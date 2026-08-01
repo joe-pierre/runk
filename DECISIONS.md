@@ -735,3 +735,39 @@ Index unique insensible à la casse pour rester cohérent avec la déduplication
 **Fuite potentielle documentée, non corrigée dans cette tâche :** `distinctTagsProvider` (`lib/features/tags/presentation/distinct_tags_provider.dart`) dérive ses tags de `bookmarkListProvider`, qui lit `BookmarkRepository.getAllBookmarks()` **sans filtre `isHidden`** (le filtre de la Tâche 22 vit uniquement dans le `build()` de `HomeScreen`, pas dans le repository). Si un tag n'existe que sur des bookmarks masqués, il apparaît quand même dans `TagsScreen` et dans les suggestions de `TagInputField` (Tâche 13) — un utilisateur sans le code "My Eyes Only" peut ainsi deviner qu'un bookmark masqué existe (via l'existence du tag), même s'il ne peut ni le lister ni le lire. Risque mineur (aucune donnée du bookmark lui-même n'est exposée, seul un nom de tag), mais réel — hors périmètre du prompt de la Tâche 23 (qui ne portait que sur `searchBookmarks`), signalé ici plutôt que passé sous silence.
 **Leçon :** quand une règle de confidentialité (ici `isHidden`) est ajoutée à une couche `presentation/` plutôt qu'au niveau du repository/datasource qui centralise la lecture, chaque nouveau chemin de lecture doit être audité explicitement — le risque n'est pas d'oublier de filtrer un écran, mais d'oublier qu'un filtre posé une fois ne se propage à aucun autre consommateur du même repository.
 **Statut :** ✅ Résolu (recherche) — 🟡 fuite via `distinctTagsProvider` documentée, non corrigée
+
+---
+
+## [CHOIX] Tâche 24 — Retrait de "Masquer"/"Ne plus masquer" du menu contextuel partagé (ajustement explicite de la Tâche 22)
+
+**Contexte :** la Tâche 22 avait délibérément branché "Masquer"/"Ne plus masquer" dans `showBookmarkContextMenu` (voir l'entrée « Tâche 22 — Réutilisation de `showBookmarkContextMenu`... » ci-dessus), pour que `MyEyesOnlyScreen` puisse démasquer sans dupliquer de code. Revu explicitement avec l'utilisateur en Tâche 24 : ce choix rendait la fonctionnalité "My Eyes Only" devinable par n'importe quel appui long occasionnel sur *n'importe quel* bookmark visible (Home/Recherche/Tags), même par un utilisateur qui n'a jamais entendu parler de la fonctionnalité — contradictoire avec le point d'entrée volontairement discret déjà acté (Tâche 22, entrée « décisions actées en amont »).
+**Ce n'est pas une correction de bug :** le comportement de la Tâche 22 fonctionnait exactement comme prévu et testé à l'époque ; il s'agit d'un choix de discrétion plus strict, pas d'une régression corrigée.
+**Décision :** retirer entièrement `_BookmarkMenuAction.toggleHidden` et le `ListTile` associé de `bookmark_context_menu.dart` — ce menu partagé (HomeScreen/SearchScreen/TagsScreen/MyEyesOnlyScreen) ne propose plus que "Modifier les tags" et "Supprimer", sans aucune condition ni exception, dans aucun état de l'app. `MyEyesOnlyScreen` reçoit à la place une action locale dédiée (`HiddenBookmarkMenuButton`, nouveau fichier `hidden_bookmark_menu_button.dart`, `lib/features/bookmarks/presentation/`) pour "Ne plus masquer"/"Supprimer" — importée uniquement par `my_eyes_only_screen.dart`.
+**Conséquence :** l'entrée « Tâche 22 — Réutilisation de `showBookmarkContextMenu`... » ci-dessus ne décrit donc plus le comportement actuel du code — conservée telle quelle par souci d'historique plutôt que réécrite ; cette entrée-ci fait foi pour l'état courant.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 24 — Nouveau flux de sélection multiple `AddToMyEyesOnlyScreen`
+
+**Contexte :** sans l'entrée "Masquer" du menu contextuel partagé (voir entrée ci-dessus), il fallait un nouveau chemin pour masquer un bookmark, accessible uniquement depuis l'intérieur de `MyEyesOnlyScreen` (donc déjà protégé par le code).
+**Décision :** nouvel écran `add_to_my_eyes_only_screen.dart` (`lib/features/bookmarks/presentation/`), liste à cases à cocher (`CheckboxListTile`) des bookmarks `isHidden == false`, dérivée de `bookmarkListProvider` comme `MyEyesOnlyScreen` (même pattern de filtrage client, voir sa doc de classe). Sélection multiple plutôt qu'un masquage bookmark par bookmark, pour permettre de masquer plusieurs bookmarks en une seule visite de l'écran. Accessible uniquement via un second `FloatingActionButton` (icône `Icons.add`) sur `MyEyesOnlyScreen`, ouvert par `Navigator.push` — même raisonnement que `MyEyesOnlyScreen` lui-même (voir entrée « Tâche 22 — `MyEyesOnlyScreen` ouvert via `Navigator.push`, pas une route `go_router` » : une route `go_router` créerait un chemin d'accès adressable qui contournerait le code).
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 24 — Aucune session "déverrouillée" persistante : la discrétion vient de la navigation, pas d'un flag
+
+**Contexte :** le prompt de tâche demandait explicitement de documenter pourquoi aucun nouvel état de session/déverrouillage n'est nécessaire, `MyEyesOnlyScreen` ne pouvant plus s'appuyer sur le menu contextuel partagé pour démasquer.
+**Alternatives envisagées :** (1) un provider Riverpod (ex: `isMyEyesOnlyUnlockedProvider`) mémorisant que le code vient d'être saisi avec succès, pour par exemple permettre un accès simplifié tant que l'app reste au premier plan ; (2) aucun état partagé — la protection redevient pleinement effective dès que l'utilisateur quitte `MyEyesOnlyScreen`.
+**Décision :** option 2. `MyEyesOnlyScreen` n'est atteignable que via `openMyEyesOnly` (code correct requis à chaque appui long sur "Runk", Tâche 22) ; un retour arrière ramène à un contexte où ni le menu contextuel partagé (Tâche 24, entrée ci-dessus) ni la nouvelle action locale (`HiddenBookmarkMenuButton`, présente uniquement dans l'arbre de `MyEyesOnlyScreen`) ne sont atteignables. Il n'existe donc aucun état intermédiaire "déverrouillé mais pas sur l'écran" à protéger : soit l'utilisateur est effectivement sur `MyEyesOnlyScreen` (code déjà vérifié pour cette navigation précise), soit il n'y est pas et aucune action liée au masquage n'est jamais visible ni exécutable, quel que soit l'écran affiché. Un flag de session ajouterait un état à invalider correctement (retour arrière, mise en arrière-plan, kill de l'app) sans bénéfice pour le critère d'acceptation de cette tâche.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 24 — Perte de "Modifier les tags" depuis `MyEyesOnlyScreen` (trade-off assumé)
+
+**Contexte :** `MyEyesOnlyScreen` bénéficiait, depuis la Tâche 22, du menu contextuel complet (`showBookmarkContextMenu` branché sur `onLongPress`), donc aussi de "Modifier les tags" pour un bookmark masqué. Le retrait total du masquage de ce menu partagé (voir entrée ci-dessus) posait une question non tranchée par le prompt de tâche : fallait-il garder `onLongPress`/`showBookmarkContextMenu` branché sur `MyEyesOnlyScreen` en plus de la nouvelle action locale, ou le retirer entièrement ?
+**Alternatives envisagées :** (1) garder les deux (`onLongPress` vers le menu partagé pour "Modifier les tags"/"Supprimer", en plus du bouton local dédié pour "Ne plus masquer"/"Supprimer") — deux façons différentes de supprimer un bookmark depuis le même écran, source de confusion ; (2) retirer entièrement `onLongPress` de `MyEyesOnlyScreen`, ne garder que l'action locale à deux choix explicitement demandée par le prompt de tâche.
+**Décision :** option 2. Un bookmark masqué peut être démasqué puis, une fois redevenu visible dans `HomeScreen`, avoir ses tags modifiés comme n'importe quel autre bookmark via le menu partagé habituel — perte d'un raccourci depuis `MyEyesOnlyScreen`, pas d'une capacité de l'app. Cohérent avec le libellé exact demandé par le prompt de tâche ("deux choix : Ne plus masquer / Supprimer").
+**Statut :** 🔵 Choix assumé
