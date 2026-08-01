@@ -18,71 +18,94 @@ class _FakeBookmarkList extends BookmarkList {
 }
 
 void main() {
-  testWidgets(
-    'affiche un message quand aucun bookmark n\'est masqué',
-    (tester) async {
-      final visible = VideoBookmark(
-        id: '1',
-        url: 'https://youtube.com/watch?v=abc',
-        title: 'Vidéo visible',
-        source: VideoSource.youtube,
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-      );
+  testWidgets('affiche un message quand aucun bookmark n\'est masqué', (
+    tester,
+  ) async {
+    final visible = VideoBookmark(
+      id: '1',
+      url: 'https://youtube.com/watch?v=abc',
+      title: 'Vidéo visible',
+      source: VideoSource.youtube,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+    );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            bookmarkListProvider.overrideWith(
-              () => _FakeBookmarkList([visible]),
-            ),
-          ],
-          child: const MaterialApp(home: MyEyesOnlyScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          bookmarkListProvider.overrideWith(() => _FakeBookmarkList([visible])),
+        ],
+        child: const MaterialApp(home: MyEyesOnlyScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Aucun bookmark masqué.'), findsOneWidget);
-      expect(find.text('Vidéo visible'), findsNothing);
-    },
-  );
+    expect(find.text('Aucun bookmark masqué.'), findsOneWidget);
+    expect(find.text('Vidéo visible'), findsNothing);
+  });
 
-  testWidgets(
-    'affiche uniquement les bookmarks isHidden: true, en réutilisant '
-    'BookmarkCard',
-    (tester) async {
-      final visible = VideoBookmark(
-        id: '1',
-        url: 'https://youtube.com/watch?v=abc',
-        title: 'Vidéo visible',
-        source: VideoSource.youtube,
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-      );
-      final hidden = VideoBookmark(
-        id: '2',
-        url: 'https://youtube.com/watch?v=xyz',
-        title: 'Vidéo masquée',
-        source: VideoSource.youtube,
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        isHidden: true,
-      );
+  testWidgets('affiche uniquement les bookmarks isHidden: true, en réutilisant '
+      'BookmarkCard', (tester) async {
+    final visible = VideoBookmark(
+      id: '1',
+      url: 'https://youtube.com/watch?v=abc',
+      title: 'Vidéo visible',
+      source: VideoSource.youtube,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+    );
+    final hidden = VideoBookmark(
+      id: '2',
+      url: 'https://youtube.com/watch?v=xyz',
+      title: 'Vidéo masquée',
+      source: VideoSource.youtube,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      isHidden: true,
+    );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            bookmarkListProvider.overrideWith(
-              () => _FakeBookmarkList([visible, hidden]),
-            ),
-          ],
-          child: const MaterialApp(home: MyEyesOnlyScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          bookmarkListProvider.overrideWith(
+            () => _FakeBookmarkList([visible, hidden]),
+          ),
+        ],
+        child: const MaterialApp(home: MyEyesOnlyScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Vidéo masquée'), findsOneWidget);
-      expect(find.text('Vidéo visible'), findsNothing);
-    },
-  );
+    expect(find.text('Vidéo masquée'), findsOneWidget);
+    expect(find.text('Vidéo visible'), findsNothing);
+  });
+
+  testWidgets('le bouton "+" ouvre AddToMyEyesOnlyScreen (Tâche 24)', (
+    tester,
+  ) async {
+    final hidden = VideoBookmark(
+      id: '2',
+      url: 'https://youtube.com/watch?v=xyz',
+      title: 'Vidéo masquée',
+      source: VideoSource.youtube,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      isHidden: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          bookmarkListProvider.overrideWith(() => _FakeBookmarkList([hidden])),
+        ],
+        child: const MaterialApp(home: MyEyesOnlyScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ajouter à My Eyes Only'), findsOneWidget);
+  });
 }

@@ -9,6 +9,7 @@ import 'package:runk/features/bookmarks/data/bookmark_local_datasource.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository_provider.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
+import 'package:runk/features/bookmarks/presentation/bookmark_context_menu.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
 import 'package:runk/features/tags/data/tag_repository.dart';
@@ -138,14 +139,18 @@ void main() {
   /// `openBookmark` se déclenchait à sa place). On simule donc la pression
   /// manuellement avec une vraie attente réelle, supérieure à
   /// `kLongPressTimeout` (500 ms).
-  Future<void> longPressUnderRunAsync(WidgetTester tester, Finder finder) async {
+  Future<void> longPressUnderRunAsync(
+    WidgetTester tester,
+    Finder finder,
+  ) async {
     final gesture = await tester.startGesture(tester.getCenter(finder));
     await Future<void>.delayed(const Duration(milliseconds: 700));
     await gesture.up();
   }
 
   testWidgets(
-    'un appui long sur une carte ouvre le menu avec ses trois actions',
+    'un appui long sur une carte ouvre le menu avec exactement ses deux '
+    'actions',
     (tester) async {
       await tester.runAsync(() async {
         await repository.createBookmark(
@@ -161,48 +166,58 @@ void main() {
         await pumpFrames(tester);
 
         expect(find.text('Modifier les tags'), findsOneWidget);
-        expect(find.text('Masquer'), findsOneWidget);
         expect(find.text('Supprimer'), findsOneWidget);
+        // Tâche 24 : le menu partagé ne doit plus jamais mentionner le
+        // masquage (voir DECISIONS.md, ajustement de la Tâche 22).
+        expect(find.text('Masquer'), findsNothing);
+        expect(find.text('Ne plus masquer'), findsNothing);
       });
     },
   );
 
   testWidgets(
-    '"Masquer" (Tâche 22) retire immédiatement le bookmark de HomeScreen, '
-    'et le menu propose ensuite "Ne plus masquer"',
+    'le menu ne propose jamais "Masquer"/"Ne plus masquer", même pour un '
+    'bookmark déjà masqué (Tâche 24)',
     (tester) async {
-      await tester.runAsync(() async {
-        await repository.createBookmark(
-          url: 'https://www.youtube.com/watch?v=abc',
-          title: 'Ma vidéo',
-          source: VideoSource.youtube,
-        );
+      final hiddenBookmark = VideoBookmark(
+        id: 'hidden-1',
+        url: 'https://www.youtube.com/watch?v=hidden',
+        title: 'Vidéo masquée',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        isHidden: true,
+      );
 
-        await pumpHomeScreen(tester);
-        await pumpFrames(tester);
+      // Appelle `showBookmarkContextMenu` directement, sans passer par
+      // `HomeScreen`/`MyEyesOnlyScreen` (qui filtrent déjà les bookmarks
+      // masqués côté présentation) : ce test vérifie le comportement du
+      // menu lui-même, indépendamment de qui l'appelle — le critère
+      // d'acceptation de la Tâche 24 porte explicitement sur "aucun état de
+      // l'app", pas seulement les écrans qui filtrent déjà `isHidden`.
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: Consumer(
+                builder: (context, ref, _) => ElevatedButton(
+                  onPressed: () =>
+                      showBookmarkContextMenu(context, ref, hiddenBookmark),
+                  child: const Text('Ouvrir le menu'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 
-        await longPressUnderRunAsync(tester, find.text('Ma vidéo'));
-        await pumpFrames(tester);
-        await tester.tap(find.text('Masquer'));
-        await pumpFrames(tester);
+      await tester.tap(find.text('Ouvrir le menu'));
+      await tester.pumpAndSettle();
 
-        List<VideoBookmark> updated;
-        var attempts = 0;
-        do {
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-          updated = await repository.getAllBookmarks();
-          attempts++;
-        } while (!updated.single.isHidden && attempts < 100);
-        expect(updated.single.isHidden, isTrue);
-
-        final container = ProviderScope.containerOf(
-          tester.element(find.byType(HomeScreen)),
-        );
-        await container.read(bookmarkListProvider.notifier).refresh();
-        await pumpFrames(tester);
-
-        expect(find.text('Ma vidéo'), findsNothing);
-      });
+      expect(find.text('Modifier les tags'), findsOneWidget);
+      expect(find.text('Supprimer'), findsOneWidget);
+      expect(find.text('Masquer'), findsNothing);
+      expect(find.text('Ne plus masquer'), findsNothing);
     },
   );
 
