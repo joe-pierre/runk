@@ -50,6 +50,7 @@ class BookmarkRepository {
       ..thumbnailUrl = thumbnailUrl
       ..source = source.name
       ..isPartial = isPartial
+      ..isHidden = false
       ..tags = tags
       ..note = note
       ..createdAt = now
@@ -87,6 +88,7 @@ class BookmarkRepository {
       ..thumbnailUrl = bookmark.thumbnailUrl
       ..source = bookmark.source.name
       ..isPartial = bookmark.isPartial
+      ..isHidden = bookmark.isHidden
       ..tags = bookmark.tags
       ..note = bookmark.note
       ..updatedAt = DateTime.now()
@@ -244,6 +246,19 @@ class BookmarkRepository {
     }
   }
 
+  /// Démasque tous les bookmarks actuellement `isHidden: true` (flux "Code
+  /// oublié ?" de la section "My Eyes Only", Tâche 22, voir DECISIONS.md) :
+  /// aucune perte de données, seule la visibilité change. Réutilise
+  /// [updateBookmark] pour chacun plutôt qu'un accès direct à Isar, afin de
+  /// bénéficier de la même tentative de synchronisation distante qu'une
+  /// modification normale.
+  Future<void> unhideAllBookmarks() async {
+    final bookmarks = await getAllBookmarks();
+    for (final bookmark in bookmarks.where((bookmark) => bookmark.isHidden)) {
+      await updateBookmark(bookmark.copyWith(isHidden: false));
+    }
+  }
+
   /// Recherche full-text locale sur titre + tags (voir SPEC.md section 11) —
   /// délègue entièrement à [BookmarkLocalDatasource.searchByTitleOrTags],
   /// jamais d'appel à [_remoteDatasource] : la donnée locale est la seule
@@ -273,6 +288,7 @@ class BookmarkRepository {
     'tags': entity.tags,
     'note': entity.note,
     'is_partial': entity.isPartial,
+    'is_hidden': entity.isHidden,
     'created_at': entity.createdAt.toIso8601String(),
     'updated_at': entity.updatedAt.toIso8601String(),
   };
@@ -288,6 +304,7 @@ class BookmarkRepository {
     ..thumbnailUrl = row['thumbnail_url'] as String?
     ..source = row['source'] as String
     ..isPartial = row['is_partial'] as bool? ?? false
+    ..isHidden = row['is_hidden'] as bool? ?? false
     ..tags = List<String>.from(row['tags'] as List? ?? const [])
     ..note = row['note'] as String?
     ..createdAt = DateTime.parse(row['created_at'] as String)
@@ -302,6 +319,7 @@ class BookmarkRepository {
     thumbnailUrl: entity.thumbnailUrl,
     source: VideoSource.values.byName(entity.source),
     isPartial: entity.isPartial,
+    isHidden: entity.isHidden,
     tags: entity.tags,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,

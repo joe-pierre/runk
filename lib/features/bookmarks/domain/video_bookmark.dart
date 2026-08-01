@@ -18,6 +18,7 @@ class VideoBookmark {
     required this.updatedAt,
     this.thumbnailUrl,
     this.isPartial = false,
+    this.isHidden = false,
     this.tags = const [],
     this.note,
   });
@@ -42,6 +43,12 @@ class VideoBookmark {
   /// SPEC.md section 4 règle 3).
   final bool isPartial;
 
+  /// Vrai si ce bookmark est masqué dans la section "My Eyes Only" (Tâche
+  /// 22, voir DECISIONS.md) : n'apparaît alors plus dans `HomeScreen`, mais
+  /// reste synchronisé avec Supabase comme n'importe quel autre champ (voir
+  /// `BookmarkRepository`) — seul le code d'accès local ne l'est jamais.
+  final bool isHidden;
+
   /// Tags associés par l'utilisateur.
   final List<String> tags;
 
@@ -62,6 +69,7 @@ class VideoBookmark {
     String? title,
     String? thumbnailUrl,
     bool? isPartial,
+    bool? isHidden,
     List<String>? tags,
     String? note,
   }) {
@@ -74,6 +82,7 @@ class VideoBookmark {
       updatedAt: updatedAt,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       isPartial: isPartial ?? this.isPartial,
+      isHidden: isHidden ?? this.isHidden,
       tags: tags ?? this.tags,
       note: note ?? this.note,
     );

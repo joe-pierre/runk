@@ -1,0 +1,69 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'bookmark_card.dart';
+import 'bookmark_context_menu.dart';
+import 'bookmark_list_provider.dart';
+import 'open_bookmark_action.dart';
+
+/// Écran "My Eyes Only" (Tâche 22, voir DECISIONS.md) : liste des bookmarks
+/// masqués (`VideoBookmark.isHidden == true`), accessible uniquement après
+/// un code correct (voir `openMyEyesOnly` dans `my_eyes_only_access.dart`).
+///
+/// Dérivé de [bookmarkListProvider] et filtré côté client, exactement comme
+/// le fait déjà `HomeScreen` pour le filtre par tag (voir CONVENTIONS.md,
+/// contrainte de la Tâche 9) : aucun nouvel accès direct à Isar/Supabase,
+/// `BookmarkCard` reste le seul widget d'affichage d'un bookmark. Le menu
+/// contextuel (`showBookmarkContextMenu`) reste disponible ici, ce qui
+/// permet notamment de "Ne plus masquer" un bookmark directement depuis
+/// cet écran.
+class MyEyesOnlyScreen extends ConsumerWidget {
+  const MyEyesOnlyScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bookmarksAsync = ref.watch(bookmarkListProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('My Eyes Only')),
+      body: bookmarksAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Text(
+            'Impossible de charger vos bookmarks.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+        data: (allBookmarks) {
+          final hiddenBookmarks = allBookmarks
+              .where((bookmark) => bookmark.isHidden)
+              .toList();
+          if (hiddenBookmarks.isEmpty) {
+            return Center(
+              child: Text(
+                'Aucun bookmark masqué.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: hiddenBookmarks.length,
+            itemBuilder: (context, index) {
+              final bookmark = hiddenBookmarks[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: BookmarkCard(
+                  bookmark: bookmark,
+                  onTap: () => openBookmark(context, ref, bookmark),
+                  onLongPress: () =>
+                      showBookmarkContextMenu(context, ref, bookmark),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

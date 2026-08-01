@@ -116,6 +116,7 @@ create table bookmarks (
   tags text[] default '{}',
   note text,
   is_partial boolean default false,
+  is_hidden boolean not null default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -128,6 +129,16 @@ using (auth.uid() = user_id);
 
 create index on bookmarks using gin(tags);
 create index on bookmarks (user_id, created_at desc);
+```
+
+### 3.2 bis Mettre à jour un projet Supabase existant
+
+Ce projet ne gère aucune migration automatisée : toute évolution du schéma d'un projet Supabase déjà créé (dev ou prod) doit être exécutée **manuellement** dans le **SQL Editor** de Supabase, sur chaque projet concerné.
+
+Tâche 22 (« My Eyes Only ») a ajouté la colonne `is_hidden` après la création initiale de certains projets — exécute ce script sur tout projet créé avant cette tâche :
+
+```sql
+alter table bookmarks add column is_hidden boolean not null default false;
 ```
 
 ### 3.3 Récupérer les clés d'API

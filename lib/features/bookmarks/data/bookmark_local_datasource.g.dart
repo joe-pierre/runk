@@ -27,33 +27,34 @@ const BookmarkEntitySchema = CollectionSchema(
       name: r'isDeletedLocally',
       type: IsarType.bool,
     ),
+    r'isHidden': PropertySchema(id: 2, name: r'isHidden', type: IsarType.bool),
     r'isPartial': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'isPartial',
       type: IsarType.bool,
     ),
-    r'isSynced': PropertySchema(id: 3, name: r'isSynced', type: IsarType.bool),
-    r'note': PropertySchema(id: 4, name: r'note', type: IsarType.string),
+    r'isSynced': PropertySchema(id: 4, name: r'isSynced', type: IsarType.bool),
+    r'note': PropertySchema(id: 5, name: r'note', type: IsarType.string),
     r'remoteId': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'remoteId',
       type: IsarType.string,
     ),
-    r'source': PropertySchema(id: 6, name: r'source', type: IsarType.string),
-    r'tags': PropertySchema(id: 7, name: r'tags', type: IsarType.stringList),
+    r'source': PropertySchema(id: 7, name: r'source', type: IsarType.string),
+    r'tags': PropertySchema(id: 8, name: r'tags', type: IsarType.stringList),
     r'thumbnailUrl': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'thumbnailUrl',
       type: IsarType.string,
     ),
-    r'title': PropertySchema(id: 9, name: r'title', type: IsarType.string),
+    r'title': PropertySchema(id: 10, name: r'title', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
-    r'url': PropertySchema(id: 11, name: r'url', type: IsarType.string),
-    r'userId': PropertySchema(id: 12, name: r'userId', type: IsarType.string),
+    r'url': PropertySchema(id: 12, name: r'url', type: IsarType.string),
+    r'userId': PropertySchema(id: 13, name: r'userId', type: IsarType.string),
   },
 
   estimateSize: _bookmarkEntityEstimateSize,
@@ -136,17 +137,18 @@ void _bookmarkEntitySerialize(
 ) {
   writer.writeDateTime(offsets[0], object.createdAt);
   writer.writeBool(offsets[1], object.isDeletedLocally);
-  writer.writeBool(offsets[2], object.isPartial);
-  writer.writeBool(offsets[3], object.isSynced);
-  writer.writeString(offsets[4], object.note);
-  writer.writeString(offsets[5], object.remoteId);
-  writer.writeString(offsets[6], object.source);
-  writer.writeStringList(offsets[7], object.tags);
-  writer.writeString(offsets[8], object.thumbnailUrl);
-  writer.writeString(offsets[9], object.title);
-  writer.writeDateTime(offsets[10], object.updatedAt);
-  writer.writeString(offsets[11], object.url);
-  writer.writeString(offsets[12], object.userId);
+  writer.writeBool(offsets[2], object.isHidden);
+  writer.writeBool(offsets[3], object.isPartial);
+  writer.writeBool(offsets[4], object.isSynced);
+  writer.writeString(offsets[5], object.note);
+  writer.writeString(offsets[6], object.remoteId);
+  writer.writeString(offsets[7], object.source);
+  writer.writeStringList(offsets[8], object.tags);
+  writer.writeString(offsets[9], object.thumbnailUrl);
+  writer.writeString(offsets[10], object.title);
+  writer.writeDateTime(offsets[11], object.updatedAt);
+  writer.writeString(offsets[12], object.url);
+  writer.writeString(offsets[13], object.userId);
 }
 
 BookmarkEntity _bookmarkEntityDeserialize(
@@ -158,18 +160,19 @@ BookmarkEntity _bookmarkEntityDeserialize(
   final object = BookmarkEntity();
   object.createdAt = reader.readDateTime(offsets[0]);
   object.isDeletedLocally = reader.readBool(offsets[1]);
-  object.isPartial = reader.readBool(offsets[2]);
-  object.isSynced = reader.readBool(offsets[3]);
+  object.isHidden = reader.readBool(offsets[2]);
+  object.isPartial = reader.readBool(offsets[3]);
+  object.isSynced = reader.readBool(offsets[4]);
   object.isarId = id;
-  object.note = reader.readStringOrNull(offsets[4]);
-  object.remoteId = reader.readString(offsets[5]);
-  object.source = reader.readString(offsets[6]);
-  object.tags = reader.readStringList(offsets[7]) ?? [];
-  object.thumbnailUrl = reader.readStringOrNull(offsets[8]);
-  object.title = reader.readStringOrNull(offsets[9]);
-  object.updatedAt = reader.readDateTime(offsets[10]);
-  object.url = reader.readString(offsets[11]);
-  object.userId = reader.readStringOrNull(offsets[12]);
+  object.note = reader.readStringOrNull(offsets[5]);
+  object.remoteId = reader.readString(offsets[6]);
+  object.source = reader.readString(offsets[7]);
+  object.tags = reader.readStringList(offsets[8]) ?? [];
+  object.thumbnailUrl = reader.readStringOrNull(offsets[9]);
+  object.title = reader.readStringOrNull(offsets[10]);
+  object.updatedAt = reader.readDateTime(offsets[11]);
+  object.url = reader.readString(offsets[12]);
+  object.userId = reader.readStringOrNull(offsets[13]);
   return object;
 }
 
@@ -189,22 +192,24 @@ P _bookmarkEntityDeserializeProp<P>(
     case 3:
       return (reader.readBool(offset)) as P;
     case 4:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 6:
       return (reader.readString(offset)) as P;
     case 7:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readStringList(offset) ?? []) as P;
     case 9:
       return (reader.readStringOrNull(offset)) as P;
     case 10:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -479,6 +484,15 @@ extension BookmarkEntityQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(property: r'isDeletedLocally', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  isHiddenEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'isHidden', value: value),
       );
     });
   }
@@ -1896,6 +1910,19 @@ extension BookmarkEntityQuerySortBy
     });
   }
 
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy> sortByIsHidden() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy>
+  sortByIsHiddenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.desc);
+    });
+  }
+
   QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy> sortByIsPartial() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isPartial', Sort.asc);
@@ -2051,6 +2078,19 @@ extension BookmarkEntityQuerySortThenBy
   thenByIsDeletedLocallyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isDeletedLocally', Sort.desc);
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy> thenByIsHidden() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy>
+  thenByIsHiddenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.desc);
     });
   }
 
@@ -2212,6 +2252,12 @@ extension BookmarkEntityQueryWhereDistinct
     });
   }
 
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QDistinct> distinctByIsHidden() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isHidden');
+    });
+  }
+
   QueryBuilder<BookmarkEntity, BookmarkEntity, QDistinct>
   distinctByIsPartial() {
     return QueryBuilder.apply(this, (query) {
@@ -2312,6 +2358,12 @@ extension BookmarkEntityQueryProperty
   isDeletedLocallyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isDeletedLocally');
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, bool, QQueryOperations> isHiddenProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isHidden');
     });
   }
 
