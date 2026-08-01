@@ -1,6 +1,8 @@
+import 'package:html_unescape/html_unescape.dart';
 import 'package:http/http.dart' as http;
 
-/// Résultat brut de l'extraction des balises Open Graph d'une page HTML.
+/// Résultat de l'extraction des balises Open Graph d'une page HTML, déjà
+/// décodé de ses entités HTML (`&quot;`, `&#x2014;`, `&#x4eca;`, etc.).
 ///
 /// Les deux champs sont `null` si la balise correspondante est absente —
 /// distinct d'une chaîne vide, qui signifierait que la balise existe mais
@@ -10,10 +12,10 @@ class OgTags {
   /// page peut exposer `og:title` sans `og:image`, ou aucun des deux.
   const OgTags({this.title, this.imageUrl});
 
-  /// Contenu de la balise `og:title`, ou `null` si absente.
+  /// Contenu décodé de la balise `og:title`, ou `null` si absente.
   final String? title;
 
-  /// Contenu de la balise `og:image`, ou `null` si absente.
+  /// Contenu décodé de la balise `og:image`, ou `null` si absente.
   final String? imageUrl;
 }
 
@@ -44,6 +46,14 @@ class OgTagScraper {
     '''content=["']([^"']*)["']''',
     caseSensitive: false,
   );
+
+  /// Décodeur d'entités HTML (`&quot;`, `&#x2014;`, `&#x4eca;`, etc.).
+  ///
+  /// Le HTML source d'Instagram/Facebook/Threads encode systématiquement le
+  /// contenu de l'attribut `content` des balises `og:` — sans ce décodage,
+  /// des titres illisibles remonteraient jusqu'à l'UI (voir DECISIONS.md,
+  /// Tâche 11).
+  static final _htmlUnescape = HtmlUnescape();
 
   /// Récupère et parse les balises `og:title`/`og:image` de la page [url].
   ///
@@ -76,7 +86,7 @@ class OgTagScraper {
         continue;
       }
       final content = _contentAttributePattern.firstMatch(tag)?.group(1);
-      if (content != null) return content;
+      if (content != null) return _htmlUnescape.convert(content);
     }
     return null;
   }

@@ -49,6 +49,7 @@ dependencies:
   riverpod_annotation: ^4.0.0
   shared_preferences: ^2.5.3
   connectivity_plus: ^7.3.1
+  html_unescape: ^2.0.0
 
 dev_dependencies:
   flutter_test:
