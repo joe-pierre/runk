@@ -53,4 +53,29 @@ class VideoBookmark {
 
   /// Note libre optionnelle.
   final String? note;
+
+  /// Retourne une copie de ce bookmark, en remplaçant uniquement les champs
+  /// fournis — utilisé notamment par `bookmark_context_menu.dart` pour
+  /// modifier les tags sans altérer les autres champs avant de les
+  /// transmettre à `BookmarkRepository.updateBookmark`.
+  VideoBookmark copyWith({
+    String? title,
+    String? thumbnailUrl,
+    bool? isPartial,
+    List<String>? tags,
+    String? note,
+  }) {
+    return VideoBookmark(
+      id: id,
+      url: url,
+      title: title ?? this.title,
+      source: source,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      isPartial: isPartial ?? this.isPartial,
+      tags: tags ?? this.tags,
+      note: note ?? this.note,
+    );
+  }
 }
