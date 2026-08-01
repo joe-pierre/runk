@@ -99,6 +99,33 @@ void main() {
   );
 
   testWidgets(
+    'un tap sur le bouton "+" ajoute le tag tapé manuellement et vide le '
+    'champ',
+    (tester) async {
+      List<String>? updatedTags;
+
+      await _pumpTagInputField(
+        tester,
+        existingTags: const [],
+        tags: const [],
+        onTagsChanged: (tags) => updatedTags = tags,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'randonnée');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+
+      expect(updatedTags, ['randonnée']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '',
+      );
+    },
+  );
+
+  testWidgets(
     'ne propose pas un tag déjà ajouté, et ne permet pas de le dupliquer',
     (tester) async {
       var callCount = 0;

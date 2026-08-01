@@ -14,6 +14,12 @@ import '../../tags/presentation/distinct_tags_provider.dart';
 /// insensible à la casse sur le texte en cours de saisie, et affichées sous
 /// le champ plutôt que dans un `Autocomplete` plein écran qui masquerait le
 /// reste de la modale.
+///
+/// Un tag tapé manuellement peut être validé de deux façons, toutes deux
+/// purement locales à cette liste en attente (aucune persistance tant que
+/// `AddBookmarkSheet` n'a pas sauvegardé le bookmark, voir Tâche 14) :
+/// via le clavier (`onSubmitted`), ou via le bouton "+" explicite à côté du
+/// champ — distinct du tap sur une suggestion existante (Tâche 13).
 class TagInputField extends ConsumerStatefulWidget {
   /// Crée le champ pour la liste [tags] actuellement sélectionnée.
   /// [onTagsChanged] est appelé avec la nouvelle liste à chaque changement.
@@ -108,15 +114,28 @@ class _TagInputFieldState extends ConsumerState<TagInputField> {
               ],
             ),
           ),
-        TextField(
-          controller: _controller,
-          decoration: const InputDecoration(
-            labelText: 'Tags',
-            helperText: 'Tapez puis validez pour ajouter un tag',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (value) => setState(() => _query = value),
-          onSubmitted: _addTag,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                decoration: const InputDecoration(
+                  labelText: 'Tags',
+                  helperText: 'Tapez puis validez pour ajouter un tag',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) => setState(() => _query = value),
+                onSubmitted: _addTag,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              tooltip: 'Ajouter ce tag',
+              onPressed: () => _addTag(_controller.text),
+              icon: const Icon(Icons.add),
+            ),
+          ],
         ),
         if (suggestions.isNotEmpty)
           Container(

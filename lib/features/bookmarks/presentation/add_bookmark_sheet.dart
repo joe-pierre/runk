@@ -134,7 +134,7 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.check),
-                  label: const Text('Enregistrer'),
+                  label: const Text('Ajouter'),
                 ),
               ],
             );
