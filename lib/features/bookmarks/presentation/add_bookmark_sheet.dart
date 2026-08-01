@@ -6,6 +6,7 @@ import '../../../core/services/metadata/metadata_service_provider.dart';
 import '../../../core/services/metadata/video_metadata.dart';
 import '../data/bookmark_repository_provider.dart';
 import 'bookmark_list_provider.dart';
+import 'tag_input_field.dart';
 
 /// Modale d'ajout d'un bookmark à partir d'une [url] déjà validée (reçue via
 /// Share Intent, clipboard, ou saisie manuelle future).
@@ -39,14 +40,13 @@ class AddBookmarkSheet extends ConsumerStatefulWidget {
 
 class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
   final _titleController = TextEditingController();
-  final _tagsController = TextEditingController();
+  List<String> _tags = [];
   bool _titleInitialized = false;
   bool _isSaving = false;
 
   @override
   void dispose() {
     _titleController.dispose();
-    _tagsController.dispose();
     super.dispose();
   }
 
@@ -56,14 +56,6 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
     if (_titleInitialized) return;
     _titleController.text = metadata.title;
     _titleInitialized = true;
-  }
-
-  List<String> _parseTags() {
-    return _tagsController.text
-        .split(',')
-        .map((tag) => tag.trim())
-        .where((tag) => tag.isNotEmpty)
-        .toList();
   }
 
   Future<void> _save(VideoMetadata metadata) async {
@@ -77,7 +69,7 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
         source: metadata.source,
         thumbnailUrl: metadata.thumbnailUrl,
         isPartial: metadata.isPartial,
-        tags: _parseTags(),
+        tags: _tags,
       );
       await ref.read(bookmarkListProvider.notifier).refresh();
       if (mounted) Navigator.of(context).pop();
@@ -128,13 +120,9 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _tagsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags',
-                    helperText: 'Séparés par des virgules',
-                    border: OutlineInputBorder(),
-                  ),
+                TagInputField(
+                  tags: _tags,
+                  onTagsChanged: (tags) => setState(() => _tags = tags),
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
