@@ -273,6 +273,17 @@
 
 ---
 
+## [RÉSOLU] Tâche 11 — Décodage des entités HTML dans `OgTagScraper`
+
+**Contexte :** `OgTagScraper._extractProperty` (`lib/core/services/metadata/providers/og_tag_scraper.dart`, Tâche 7) extrayait le contenu brut de l'attribut `content` des balises `<meta property="og:...">` sans décoder les entités HTML.
+**Symptôme / Problème :** le HTML source d'Instagram/Facebook/Threads encode systématiquement cet attribut (`&quot;`, `&#x2014;`, entités numériques hors ASCII type `&#x4eca;`), ce qui faisait remonter des titres illisibles jusqu'à l'UI (`AddBookmarkSheet`, `BookmarkCard`, `HomeScreen`) — bug constaté sur test manuel appareil physique.
+**Cause / Alternatives :** `dart:convert` ne fournit aucun décodeur d'entités HTML natif. (1) écrire un décodeur maison (table de correspondance des entités nommées + parsing des entités numériques décimales/hexadécimales) — écarté, réinvente un problème déjà résolu et mal couvert par une implémentation artisanale (entités nommées HTML5 nombreuses) ; (2) ajouter une dépendance dédiée après vérification de son état sur pub.dev.
+**Fix / Décision :** option 2, package `html_unescape ^2.0.0` — vérifié sur pub.dev avant ajout : 160/160 pub points, **zéro dépendance** (aucun risque de conflit transitif comparable à celui déjà rencontré avec `isar`/`riverpod`, voir DECISIONS.md entrée "Riverpod 2.x..."), supporte les SDK Dart/Flutter stables actuels (couvre `sdk: ^3.8.0`). Seul point notable : dernière publication il y a ~5 ans, jugé acceptable au vu de l'absence de dépendance et de la stabilité intrinsèque du sujet traité (spec HTML5 des entités, non appelée à changer). Décodage appliqué dans `OgTagScraper._extractProperty`, juste après extraction du `content`, donc pour `og:title` **et** `og:image` uniformément — reste entièrement dans la couche `data/` (`core/services/metadata/providers/`), jamais dans `presentation/`. Aucune modification de `InstagramProvider`/`FacebookProvider`/`ThreadsProvider` : ils ne font que relayer le résultat d'`OgTagScraper`, ce correctif unique suffit aux trois.
+**Leçon :** avant d'écrire un décodeur/parseur pour un format normalisé et non appelé à évoluer (entités HTML), vérifier si une dépendance mature et sans risque (ici zéro transitive) couvre déjà le besoin plutôt que de réinventer une implémentation partielle.
+**Statut :** ✅ Résolu
+
+---
+
 ## [CHOIX] Tâche 7 — `OgTagScraper`, utilitaire de scraping partagé entre Instagram/Facebook/Threads
 
 **Contexte :** Tâche 7, les trois providers de scraping (Instagram, Facebook, Threads) ont une logique d'extraction de balises `og:title`/`og:image` strictement identique — seule l'URL interrogée diffère. La doc de `metadata_provider.dart` (Tâche 4) précise "aucune référence croisée entre providers", ce qui interdit qu'un provider en importe un autre, mais ne concerne pas un utilitaire de bas niveau partagé.

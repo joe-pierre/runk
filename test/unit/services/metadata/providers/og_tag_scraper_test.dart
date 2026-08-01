@@ -46,6 +46,21 @@ void main() {
       expect(tags.imageUrl, isNull);
     });
 
+    test('décode les entités HTML du contenu extrait (og:title)', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response('''
+          <html><head>
+            <meta property="og:title" content="Le &quot;concert&quot; &#x2014; &#x4eca;" />
+          </head></html>
+        ''', 200);
+      });
+      final scraper = OgTagScraper(httpClient: mockClient);
+
+      final tags = await scraper.scrape('https://exemple.com/post/1');
+
+      expect(tags.title, 'Le "concert" — 今');
+    });
+
     test('retourne des champs null (jamais d\'exception) si le délai est dépassé', () async {
       final mockClient = MockClient((request) async {
         await Future<void>.delayed(const Duration(milliseconds: 50));

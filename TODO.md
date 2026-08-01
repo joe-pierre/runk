@@ -67,6 +67,7 @@
 - [x] Tests unitaires par provider (mock HTTP) + tests de l'utilitaire partagé `OgTagScraper`
 - [x] `DeepLinkService` : schémas natifs pour chaque plateforme + fallback navigateur systématique (Tâche 8) — Threads exclu volontairement, aucun schéma connu (voir `DECISIONS.md`)
 - [x] Icônes de plateforme ajoutées dans `assets/icons/` (`x.svg`, `instagram.svg`, `facebook.svg`, `threads.svg`) + déclarées dans `pubspec.yaml` — non câblées dans `bookmark_card.dart` (fichier hors périmètre de cette tâche, voir `DECISIONS.md`)
+- [x] Tâche 11 — Décodage des entités HTML (`&quot;`, `&#x2014;`, entités numériques hors ASCII) dans `OgTagScraper`, via `html_unescape`, corrigeant les titres illisibles remontés par Instagram/Facebook/Threads (voir `DECISIONS.md` et `BUGS_AND_ROADMAP.md`)
 - [ ] Test manuel sur appareil physique : partager un lien de chacune des 6 plateformes produit un bookmark valide, avec `isPartial` correctement positionné — non réalisable dans cet environnement de développement (pas d'appareil Android/iOS physique ni d'émulateur, même limitation que les tâches précédentes, voir `BUGS_AND_ROADMAP.md`), reste à faire par l'utilisateur
 - [ ] Test manuel sur appareil physique : taper une vignette Instagram/TikTok/Facebook/X ouvre l'app correspondante si installée, sinon le navigateur ; Threads ouvre toujours le navigateur (aucun schéma natif connu, voir `DECISIONS.md` Tâche 8) — non réalisable dans cet environnement de développement, reste à faire par l'utilisateur
 
