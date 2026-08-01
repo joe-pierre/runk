@@ -21,11 +21,11 @@
 - Export des bookmarks (CSV / JSON) pour sauvegarde personnelle
 - Partage d'une collection de bookmarks avec un autre utilisateur Runk (lecture seule)
 - Détection de doublons (même URL déjà sauvegardée)
-- Suggestions de tags basées sur les tags déjà utilisés par l'utilisateur (autocomplétion)
 - Widget d'accueil (Android/iOS) affichant les derniers bookmarks ajoutés
 - Version web ou tablette légère, en lecture, s'appuyant sur le même backend Supabase
 
 ## Points de vigilance techniques identifiés
+- **[2026-08-01]** Tâche 13 (`TagInputField`, autocomplétion des tags) : `flutter analyze` et `flutter test` (94 passed, 2 skipped préexistants, inchangé) vérifiés en local, y compris un nouveau test widget dédié (`test/widget/features/bookmarks/presentation/tag_input_field_test.dart`) couvrant l'affichage des suggestions par préfixe, l'ajout sans doublon au tap, et la non-duplication à la soumission d'un tag déjà présent. Aucun appareil physique disponible dans cette session (même limitation que les tâches précédentes) : le rendu réel du clavier virtuel et de la liste de suggestions sur petit écran reste à valider visuellement par l'utilisateur.
 - **[2026-08-01]** Tâche 12bis (investigation User-Agent sur `OgTagScraper`) : hypothèse de départ — l'absence de header `User-Agent` sur la requête HTTP d'`OgTagScraper.scrape` expliquerait des miniatures manquantes dès l'ajout initial (pas seulement après redémarrage, sujet distinct de la Tâche 12) — **infirmée par le test**, avec un résultat inverse de celui attendu. Test manuel effectué (script Dart autonome exécutant directement `OgTagScraper` contre le réseau réel, sans mock) sur 5 liens Instagram publics :
   - `https://www.instagram.com/reel/DX7PnqbFL50/`
   - `https://www.instagram.com/reel/Dak0VgMFbZ-/`

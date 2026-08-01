@@ -443,3 +443,23 @@
 **Leçon :** ne jamais supposer qu'imiter un navigateur réel est systématiquement la meilleure stratégie de scraping — certaines plateformes réservent leur HTML statique riche en métadonnées (`og:`) aux requêtes qui *ne* ressemblent *pas* à un navigateur (comportement de bot de prévisualisation de lien), et cassent ce même contenu pour un vrai navigateur (SPA + mur de connexion). Toujours valider un changement de header HTTP par un test avant/après sur des cas réels plutôt que sur la seule plausibilité de l'hypothèse.
 
 **Statut :** 🔵 Choix assumé (ne pas modifier `og_tag_scraper.dart`) — cause réelle des miniatures manquantes à l'ajout initial toujours non identifiée, reste ouvert (voir `BUGS_AND_ROADMAP.md`, section Points de vigilance techniques identifiés)
+
+---
+
+## [CHOIX] Tâche 13 — Passage d'un champ Tags texte libre à une liste de tags avec autocomplétion
+
+**Contexte :** Tâche 13, `AddBookmarkSheet`. Le champ Tags était jusqu'ici un unique `TextField` texte libre, tags séparés par des virgules, parsés uniquement à la sauvegarde (`_parseTags`). Le prompt de tâche demande d'afficher des suggestions issues de `distinctTagsProvider` (préfixe insensible à la casse) sous le champ, et qu'un tap sur une suggestion « l'ajoute à la liste de tags en cours de saisie (sans dupliquer un tag déjà présent) », ce qui suppose une liste de tags déjà validés à distance de ce qui est en train d'être tapé — la formulation même de la tâche implique un changement de modèle du champ, pas une simple superposition d'un `Overlay` sur le `TextField` existant.
+
+**Alternatives envisagées :**
+1. Garder le `TextField` unique à texte libre séparé par virgules, et superposer une liste de suggestions calculée sur le dernier segment tapé après la dernière virgule — techniquement possible, mais la notion de « liste de tags en cours de saisie » distincte du texte brut n'existe pas dans ce modèle, rendant la déduplication ambiguë (faut-il comparer au texte entier ou à chaque segment ?) et l'UX de suppression d'un tag individuel malaisée (retrouver puis effacer un segment au milieu d'une chaîne).
+2. Remplacer par un composant à liste de tags validés (`Chip`s, retirables) + un `TextField` ne portant que le tag en cours de frappe, les suggestions filtrant `distinctTagsProvider` sur ce texte en cours et excluant les tags déjà ajoutés ; validation manuelle d'un tag non suggéré via soumission du champ (`onSubmitted`), en plus du tap sur suggestion.
+
+**Décision :** option 2, extraite dans un nouveau widget dédié `TagInputField` (`lib/features/bookmarks/presentation/tag_input_field.dart`) — cohérent avec CONVENTIONS.md section Partials/Frontend (pas de widget anonyme complexe inline dans `AddBookmarkSheet.build`). `_AddBookmarkSheetState` ne garde qu'un état `List<String> _tags`, remplaçant `_tagsController`/`_parseTags()`. `TagInputField` ne lit `distinctTagsProvider` que via `ref.watch` (aucun accès direct à Isar), conformément à la contrainte de la tâche.
+**Choix additionnels non explicitement tranchés par le prompt, documentés ici plutôt que silencieusement :**
+- Déduplication insensible à la casse (`'Cuisine'` et `'cuisine'` sont considérés comme le même tag) — une suggestion reprise depuis `distinctTagsProvider` pourrait sinon dupliquer visuellement un tag déjà tapé avec une casse différente.
+- Ajout manuel d'un tag non suggéré conservé via soumission du champ (`onSubmitted`, touche "Terminé"/Entrée), pour ne pas régresser la possibilité de créer un tag inédit qu'offrait implicitement l'ancien champ texte libre.
+- Liste de suggestions bornée en hauteur (`maxHeight: 160`) et affichée en flux normal sous le champ (pas un `Overlay`/`Autocomplete` plein écran), conformément à la contrainte explicite de ne jamais masquer le reste de la modale.
+
+**Leçon :** quand un critère d'acceptation décrit un comportement (« liste de tags en cours de saisie », dédoublonnage) incompatible avec le modèle de données actuel d'un champ (texte brut séparé par virgules), ne pas forcer ce comportement par-dessus l'ancien modèle — vérifier si la tâche implique un changement de représentation sous-jacente avant d'implémenter, et l'extraire dans son propre composant plutôt que d'alourdir le widget appelant.
+
+**Statut :** ✅ Résolu
