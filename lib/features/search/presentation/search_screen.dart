@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/app_scaffold_key_provider.dart';
 import '../../bookmarks/presentation/bookmark_card.dart';
 import '../../bookmarks/presentation/bookmark_search_provider.dart';
 import '../../bookmarks/presentation/bookmark_selection_controller.dart';
@@ -53,6 +54,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: 'Menu',
+          onPressed: () =>
+              ref.read(appScaffoldKeyProvider).currentState?.openDrawer(),
+        ),
         title: TextField(
           controller: _controller,
           autofocus: true,

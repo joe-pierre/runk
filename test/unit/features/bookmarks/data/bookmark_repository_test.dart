@@ -107,6 +107,7 @@ void main() {
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
       tagLocalDatasource: tagLocalDatasource,
+      getCurrentUserId: () => null,
     );
   });
 
@@ -646,6 +647,95 @@ void main() {
 
       final bookmarks = await repository.getAllBookmarks();
       expect(bookmarks.single.isHidden, isTrue);
+    });
+  });
+
+  group('authentification (Tâche 28)', () {
+    test('createBookmark renseigne userId et synchronise immédiatement si une '
+        'session active existe', () async {
+      final authenticatedRepository = BookmarkRepository(
+        isar: isar,
+        localDatasource: localDatasource,
+        remoteDatasource: remoteDatasource,
+        tagLocalDatasource: tagLocalDatasource,
+        getCurrentUserId: () => 'user-1',
+      );
+
+      final created = await authenticatedRepository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=auth',
+        title: 'Créé authentifié',
+        source: VideoSource.youtube,
+      );
+
+      expect(remoteDatasource.insertedRows, hasLength(1));
+      final entity = await localDatasource.findByRemoteId(created.id);
+      expect(entity!.userId, 'user-1');
+      expect(entity.isSynced, isTrue);
+    });
+
+    test(
+      'countLocalOnlyBookmarks ne compte que les bookmarks userId == null',
+      () async {
+        await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=sans-compte',
+          title: 'Sans compte',
+          source: VideoSource.youtube,
+        );
+        final authenticatedRepository = BookmarkRepository(
+          isar: isar,
+          localDatasource: localDatasource,
+          remoteDatasource: remoteDatasource,
+          tagLocalDatasource: tagLocalDatasource,
+          getCurrentUserId: () => 'user-1',
+        );
+        await authenticatedRepository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=avec-compte',
+          title: 'Avec compte',
+          source: VideoSource.youtube,
+        );
+
+        expect(await repository.countLocalOnlyBookmarks(), 1);
+      },
+    );
+
+    test('linkLocalBookmarksToUser associe userId et force isSynced à false '
+        'sur les bookmarks non liés, sans toucher à ceux déjà liés', () async {
+      final unlinked = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=non-lie',
+        title: 'Non lié',
+        source: VideoSource.youtube,
+      );
+      final authenticatedRepository = BookmarkRepository(
+        isar: isar,
+        localDatasource: localDatasource,
+        remoteDatasource: remoteDatasource,
+        tagLocalDatasource: tagLocalDatasource,
+        getCurrentUserId: () => 'user-existant',
+      );
+      final alreadyLinked = await authenticatedRepository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=deja-lie',
+        title: 'Déjà lié',
+        source: VideoSource.youtube,
+      );
+
+      await repository.linkLocalBookmarksToUser('user-nouveau');
+
+      final unlinkedEntity = await localDatasource.findByRemoteId(unlinked.id);
+      expect(unlinkedEntity!.userId, 'user-nouveau');
+      expect(unlinkedEntity.isSynced, isFalse);
+
+      final alreadyLinkedEntity = await localDatasource.findByRemoteId(
+        alreadyLinked.id,
+      );
+      expect(alreadyLinkedEntity!.userId, 'user-existant');
+
+      expect(await repository.countLocalOnlyBookmarks(), 0);
+    });
+
+    test('linkLocalBookmarksToUser ne fait rien si aucun bookmark local '
+        'n\'est en attente de rattachement', () async {
+      await repository.linkLocalBookmarksToUser('user-1');
+      expect(await repository.countLocalOnlyBookmarks(), 0);
     });
   });
 }

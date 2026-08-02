@@ -881,3 +881,63 @@ Index unique insensible à la casse pour rester cohérent avec la déduplication
 **Leçon :** un enfant avec `shrinkWrap: true`/hauteur bornée (`TagInputField`) élimine son propre overflow interne mais ne protège pas son parent d'un dépassement global si ce parent ne défile pas lui-même — le défilement doit être porté par le conteneur qui connaît l'espace réellement disponible (ici la modale, pas le champ de tags).
 **Statut :** ✅ Résolu
 **Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 28 — `BookmarkRepository.createBookmark` renseigne désormais `userId` depuis la session active, pas seulement le rattachement rétroactif
+
+**Contexte :** Tâche 28, authentification Supabase. Le prompt de tâche ne demandait explicitement qu'une méthode de rattachement rétroactif (`linkLocalBookmarksToUser`) pour les bookmarks déjà créés hors ligne. Mais `createBookmark` (inchangé depuis la Tâche 5, voir DECISIONS.md « Tâche 5 — `user_id` absent avant l'authentification ») n'a jamais renseigné `userId`, y compris pour un bookmark créé *après* une connexion réussie — sans correctif, un tel bookmark serait resté indéfiniment `userId: null`, ne synchronisant donc jamais, ce qui contredit directement la contrainte de la tâche : "l'app doit rester pleinement utilisable sans compte, la connexion n'active que la synchronisation".
+**Alternatives envisagées :** (1) s'en tenir au texte littéral du prompt (rattachement rétroactif uniquement) et documenter ce trou comme une limite connue dans `BUGS_AND_ROADMAP.md` ; (2) faire lire à `createBookmark` l'utilisateur actuellement authentifié, via une fonction injectée en constructeur (`CurrentUserIdProvider`, `String? Function()`), même mécanisme de testabilité que `HasActiveSessionCheck` de `SyncService` (voir DECISIONS.md Tâche 9).
+**Décision :** option 2, confirmée explicitement par l'utilisateur avant implémentation. La décision initiale de la Tâche 5 ("pas de dépendance directe à Supabase Auth depuis le repository") supposait qu'aucune authentification n'existait encore dans le projet — ce n'est plus le cas depuis cette tâche, la prémisse ne tient donc plus. `bookmarkRepositoryProvider` injecte `getCurrentUserId: () => SupabaseService.client.auth.currentUser?.id`, cohérent avec `sync_service_provider.dart` qui injecte déjà `hasActiveSession` de la même façon. Impact sur les tests : les 11 fichiers qui construisaient directement un `BookmarkRepository` (10 dans `test/`, 1 dans `integration_test/`) passent désormais aussi `getCurrentUserId: () => null` (comportement inchangé pour ces tests, qui ne testent pas l'authentification), et un nouveau groupe de tests dédié (`bookmark_repository_test.dart`, "authentification (Tâche 28)") couvre le nouveau comportement avec un `getCurrentUserId` renvoyant un id fixe.
+**Leçon :** une décision d'architecture prise en l'absence d'une fonctionnalité future ("pas d'authentification pour l'instant") doit être explicitement revisitée le jour où cette fonctionnalité arrive, plutôt que de la considérer comme acquise indéfiniment — sans quoi le nouveau code (l'authentification elle-même) resterait fonctionnellement inerte pour tout ce qui est créé après son introduction.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 28 — Rattachement rétroactif déclenché à la connexion **et** à l'inscription, gardé uniquement par le nombre de bookmarks non liés
+
+**Contexte :** Tâche 28, le prompt contient une formulation ambiguë : "À la connexion réussie (pas à l'inscription si l'utilisateur n'a pas encore de bookmarks locaux non liés — vérifier le compte avant d'afficher quoi que ce soit), si au moins un bookmark local a `userId == null` : afficher une boîte de dialogue...". Lue littéralement au premier degré, cette phrase pourrait suggérer que le rattachement ne doit jamais se déclencher à l'inscription. Mais le critère d'acceptation de la même tâche décrit explicitement le scénario inverse : créer des bookmarks hors ligne, **puis créer un compte** (inscription, pas connexion sur un compte existant) fait apparaître la boîte de confirmation.
+**Alternatives envisagées :** (1) lecture littérale stricte — déclencher uniquement sur `signInWithPassword`, jamais sur `signUp` — incompatible avec le critère d'acceptation explicite ; (2) lire la parenthèse comme une clarification du garde-fou (ne rien afficher à l'inscription **si** aucun bookmark non lié n'existe, ce qui est le cas courant pour un tout nouveau compte) plutôt que comme une exclusion totale de l'inscription — cohérente avec le critère d'acceptation et avec la contrainte "vérifier le compte avant d'afficher quoi que ce soit" déjà présente dans la même phrase.
+**Décision :** option 2. `AppDrawer` déclenche `promptToLinkLocalBookmarks` sur toute transition "aucune session" → "session active" observée via `authStateChangesProvider` (`ref.listen`), que la session vienne de `signIn` ou de `signUp` — la fonction elle-même ne fait rien (aucune boîte de dialogue) si `countLocalOnlyBookmarks() == 0`, ce qui couvre exactement le cas visé par la parenthèse (une inscription "propre" sans bookmarks locaux préexistants).
+**Leçon :** face à une formulation ambiguë dans un prompt de tâche, le critère d'acceptation explicite fait autorité sur une lecture littérale d'une parenthèse elliptique — quand les deux semblent se contredire, chercher la lecture qui les réconcilie avant de trancher, plutôt que d'obéir au texte le plus proche syntaxiquement.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 28 — `AppDrawer` déclenche la confirmation de rattachement depuis son propre `context`, jamais celui d'`AuthForm`
+
+**Contexte :** Tâche 28, la confirmation de rattachement (`promptToLinkLocalBookmarks`) a besoin d'un `BuildContext` valide pour `showDialog`. Le point le plus intuitif pour déclencher cette logique aurait été directement dans `AuthForm._submit()`, juste après un `signIn`/`signUp` réussi.
+**Symptôme / problème évité :** dès qu'une connexion réussit, `authStateChangesProvider` émet un nouvel état, ce qui fait immédiatement basculer `AppDrawer` de l'affichage d'`AuthForm` vers la vue "connecté" (`_SignedInDrawerContent`) — retirant `AuthForm` de l'arbre de widgets. Déclencher `showDialog` depuis le `context` d'`AuthForm` après un `await` réseau expose donc à une fenêtre de course : selon l'ordre exact de propagation entre le rebuild de `AppDrawer` et la suite du code de `_submit()`, `AuthForm` pourrait déjà être démonté (`context.mounted == false`) au moment d'afficher la boîte de dialogue.
+**Alternatives envisagées :** (1) déclencher depuis `AuthForm`, avec une vérification `context.mounted` juste avant `showDialog` — fonctionnerait la plupart du temps mais resterait dépendant d'un ordre de reconstruction non garanti explicitement par Riverpod/Flutter ; (2) déclencher depuis `AppDrawer` lui-même, via `ref.listen(authStateChangesProvider, ...)` sur la transition "aucune session" → "session active", en utilisant le `context` d'`AppDrawer` — un widget qui reste monté tout du long (seul son contenu interne change entre `AuthForm` et la vue connectée).
+**Décision :** option 2. `AppDrawer.build` appelle `ref.listen(authStateChangesProvider, ...)` et invoque `promptToLinkLocalBookmarks(context, ref, ...)` avec son propre `context` — découplé du cycle de vie d'`AuthForm`, robuste à l'ordre de reconstruction.
+**Leçon :** quand une action différée (boîte de dialogue après un `await`) dépend d'un `BuildContext`, préférer celui du widget dont la durée de vie couvre tout le scénario (ici le conteneur qui bascule entre deux vues) plutôt que celui du widget transitoire qui va justement disparaître à cause de l'action en cours.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 28 — Erreurs Supabase enveloppées dans `AuthFailure` (exception métier dédiée), jamais `AuthException` exposée à la présentation
+
+**Contexte :** Tâche 28, contrainte explicite : "erreurs Supabase (mauvais mot de passe, email déjà utilisé, etc.) affichées à l'utilisateur, jamais avalées silencieusement". CONVENTIONS.md section Réponses API précise en complément : "les erreurs réseau/API sont capturées dans le repository et remontées sous forme de résultat typé ... ou exception métier dédiée, jamais de `try/catch` silencieux".
+**Alternatives envisagées :** (1) laisser `AuthException` (type de `package:supabase_flutter`) remonter telle quelle jusqu'à `AuthForm`, qui la catch directement — plus rapide à écrire, mais couple la couche présentation au type d'erreur d'un SDK tiers ; (2) `AuthRepository` capture `AuthException` et la relève sous forme d'`AuthFailure` (`lib/features/auth/domain/auth_failure.dart`), un type métier propre au projet qui n'expose que le message à afficher.
+**Décision :** option 2, cohérente avec la contrainte de CONVENTIONS.md citée ci-dessus. `AuthForm` catch uniquement `AuthFailure`, jamais de type Supabase — si le SDK d'authentification était remplacé un jour, seul `AuthRepository` aurait à changer.
+**Leçon :** la même règle déjà appliquée à `BookmarkRepository` (`BookmarkRemoteSyncException`, voir DECISIONS.md Tâche 5) s'applique symétriquement à l'authentification — aucune exception de bibliothèque tierce ne doit franchir la frontière `data/` → `presentation/` sans être d'abord enveloppée.
+**Statut :** ✅ Résolu
+
+---
+
+## [CHOIX] Tâche 28 — `appScaffoldKeyProvider` placé dans `core/services/`, pas `app/`, malgré une clé "créée au niveau d'AppShell"
+
+**Contexte :** Tâche 28, point 3 du prompt : un `GlobalKey<ScaffoldState>` "créé au niveau d'`AppShell`" et injecté dans `HomeScreen`/`TagsScreen`/`SearchScreen` pour qu'ils ouvrent le `Drawer` parent — écart non anticipé par SPEC.md section 11, à documenter explicitement (demande du prompt).
+**Symptôme / problème évité :** ces 3 écrans sont des `features/`, construits indépendamment d'`AppShell` par les routes `go_router` (`StatefulShellRoute.indexedStack`, voir `router.dart`) — il n'existe donc aucun moyen de leur passer la clé par simple paramètre de constructeur. Un premier essai plaçant le provider dans `lib/app/app_scaffold_key_provider.dart` aurait forcé ces 3 écrans à importer depuis `app/`, inversant la direction de dépendance établie depuis DECISIONS.md (Tâche 4, Tâche 6) : `app/` dépend de `features/`, jamais l'inverse.
+**Alternatives envisagées :** (1) `lib/app/app_scaffold_key_provider.dart`, au plus près de son usage conceptuel dans `AppShell` — écarté pour la raison ci-dessus ; (2) `lib/core/services/app_scaffold_key_provider.dart` : le provider lui-même ne dépend d'aucune feature (un simple `GlobalKey<ScaffoldState>`), donc `core/` peut le porter sans rien inverser — `HomeScreen`/`TagsScreen`/`SearchScreen` l'importent depuis `core/`, direction déjà établie et normale.
+**Décision :** option 2. `AppShell` reste l'unique endroit qui assigne effectivement cette clé à un `Scaffold` (`Scaffold(key: ref.watch(appScaffoldKeyProvider), ...)`) — seul l'emplacement du fichier du provider diffère de ce qu'une lecture superficielle du prompt pourrait suggérer.
+**Leçon :** "créé au niveau de X" dans un prompt de tâche décrit un rôle logique, pas nécessairement un emplacement de fichier obligatoire — quand le placer littéralement à cet endroit violerait une règle de dépendance déjà actée, chercher l'emplacement qui respecte la règle tout en gardant le rôle logique intact.
+**Statut :** ✅ Résolu
+
+---
+
+## [LIMITE] Tâche 28 — Flux "mot de passe oublié" non implémenté (hors périmètre explicite)
+
+**Contexte :** Tâche 28, contrainte explicite du prompt : "pas de flux 'mot de passe oublié' — à documenter comme dette dans `BUGS_AND_ROADMAP.md` si pertinent, pas à improviser ici."
+**Décision :** aucun lien "mot de passe oublié" dans `AuthForm` — un utilisateur qui oublie son mot de passe reste bloqué (pas de `resetPasswordForEmail`) tant que cette dette n'est pas reprise. Documenté dans `BUGS_AND_ROADMAP.md`, section Roadmap.
+**Statut :** 🟡 Dette assumée, non résolue

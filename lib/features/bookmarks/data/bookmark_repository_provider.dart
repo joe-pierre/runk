@@ -56,5 +56,6 @@ Future<BookmarkRepository> bookmarkRepository(Ref ref) async {
     localDatasource: BookmarkLocalDatasource(isar),
     remoteDatasource: BookmarkRemoteDatasource(SupabaseService.client),
     tagLocalDatasource: TagLocalDatasource(isar),
+    getCurrentUserId: () => SupabaseService.client.auth.currentUser?.id,
   );
 }

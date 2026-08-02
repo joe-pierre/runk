@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/app_scaffold_key_provider.dart';
 import 'bookmark_card.dart';
 import 'bookmark_context_menu.dart';
 import 'bookmark_list_provider.dart';
@@ -73,6 +74,12 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: 'Menu',
+          onPressed: () =>
+              ref.read(appScaffoldKeyProvider).currentState?.openDrawer(),
+        ),
         title: GestureDetector(
           onLongPress: () => openMyEyesOnly(context, ref),
           child: const Text('Runk'),

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../core/services/app_scaffold_key_provider.dart';
+import 'app_drawer.dart';
 
 /// Coquille de navigation principale de Runk : bottom navigation à 3 onglets
 /// (Home / Tags / Recherche), voir SPEC.md section 11.
@@ -11,7 +15,12 @@ import 'package:go_router/go_router.dart';
 /// Material 3 `NavigationBar` (équivalent moderne de la "Bottom Navigation
 /// Bar" décrite dans SPEC.md, cohérent avec `ThemeData.dark(useMaterial3:
 /// true)` déjà configuré dans `main.dart`).
-class AppShell extends StatelessWidget {
+///
+/// Porte le `Drawer` d'authentification (`AppDrawer`, Tâche 28, voir
+/// DECISIONS.md), ouvert depuis les 3 écrans via [appScaffoldKeyProvider]
+/// (voir sa doc) plutôt que `Scaffold.of(context)`, chaque écran ayant son
+/// propre `Scaffold` imbriqué.
+class AppShell extends ConsumerWidget {
   /// Crée la coquille pour [navigationShell].
   const AppShell({super.key, required this.navigationShell});
 
@@ -20,8 +29,10 @@ class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
+      key: ref.watch(appScaffoldKeyProvider),
+      drawer: const AppDrawer(),
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,

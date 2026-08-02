@@ -40,6 +40,7 @@ void main() {
       localDatasource: bookmarkLocalDatasource,
       remoteDatasource: FakeBookmarkRemoteDatasource(),
       tagLocalDatasource: tagLocalDatasource,
+      getCurrentUserId: () => null,
     );
     tagRepository = TagRepository(
       isar: isar,

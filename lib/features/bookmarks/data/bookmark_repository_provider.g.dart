@@ -172,4 +172,4 @@ final class BookmarkRepositoryProvider
 }
 
 String _$bookmarkRepositoryHash() =>
-    r'12405a3b421f0fab5085546320c5b8936356d055';
+    r'b22c5cb4eef7573a0b95bace81fc1fe342af1e05';

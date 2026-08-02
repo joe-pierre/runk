@@ -10,6 +10,17 @@ import 'bookmark_local_datasource.dart';
 import 'bookmark_remote_datasource.dart';
 import 'bookmark_remote_sync_exception.dart';
 
+/// Retourne l'identifiant de l'utilisateur actuellement authentifié, ou
+/// `null` si aucune session Supabase active n'existe — injecté pour ne pas
+/// coupler [BookmarkRepository] à un état d'authentification réel en test
+/// (même raisonnement que `HasActiveSessionCheck` de `SyncService`, voir
+/// DECISIONS.md Tâche 9). Le choix initial de la Tâche 5 (pas de dépendance
+/// directe à Supabase Auth) supposait qu'aucune authentification n'existait
+/// encore ; ce n'est plus le cas depuis la Tâche 28 (voir DECISIONS.md), qui
+/// introduit ce point d'injection plutôt que de figer une décision devenue
+/// obsolète.
+typedef CurrentUserIdProvider = String? Function();
+
 /// Point d'entrée unique entre la couche présentation et les sources de
 /// données d'un bookmark (Isar local + Supabase distant).
 ///
@@ -47,17 +58,20 @@ class BookmarkRepository {
     required BookmarkLocalDatasource localDatasource,
     required BookmarkRemoteDatasource remoteDatasource,
     required TagLocalDatasource tagLocalDatasource,
+    required CurrentUserIdProvider getCurrentUserId,
     Uuid uuid = const Uuid(),
   }) : _isar = isar,
        _localDatasource = localDatasource,
        _remoteDatasource = remoteDatasource,
        _tagLocalDatasource = tagLocalDatasource,
+       _getCurrentUserId = getCurrentUserId,
        _uuid = uuid;
 
   final Isar _isar;
   final BookmarkLocalDatasource _localDatasource;
   final BookmarkRemoteDatasource _remoteDatasource;
   final TagLocalDatasource _tagLocalDatasource;
+  final CurrentUserIdProvider _getCurrentUserId;
   final Uuid _uuid;
 
   /// Crée un nouveau bookmark : écriture locale immédiate (identifiant
@@ -67,6 +81,14 @@ class BookmarkRepository {
   /// true`, Tâche 25, voir DECISIONS.md et doc de classe), le bookmark est
   /// créé directement `isHidden: true` — aucune action supplémentaire de
   /// l'utilisateur requise.
+  ///
+  /// [BookmarkEntity.userId] est renseigné depuis [_getCurrentUserId] si une
+  /// session active existe (Tâche 28, voir DECISIONS.md) — sans quoi un
+  /// bookmark créé après connexion ne synchroniserait jamais, l'entité
+  /// restant indéfiniment `userId: null`. Un bookmark créé hors ligne avant
+  /// toute connexion reste `userId: null` comme avant (voir DECISIONS.md,
+  /// entrée "Tâche 5 — user_id absent avant l'authentification"), rattrapé
+  /// plus tard par [linkLocalBookmarksToUser].
   Future<VideoBookmark> createBookmark({
     required String url,
     required String title,
@@ -80,6 +102,7 @@ class BookmarkRepository {
     final hasHiddenTag = await _tagLocalDatasource.hasAnyHiddenTag(tags);
     final entity = BookmarkEntity()
       ..remoteId = _uuid.v4()
+      ..userId = _getCurrentUserId()
       ..url = url
       ..title = title
       ..thumbnailUrl = thumbnailUrl
@@ -374,6 +397,37 @@ class BookmarkRepository {
         await _localDatasource.deleteByRemoteId(remoteId);
       }
     }
+  }
+
+  /// Nombre de bookmarks locaux pas encore associés à un compte (`userId ==
+  /// null`) — sert à décider si la boîte de confirmation de rattachement
+  /// (Tâche 28, voir DECISIONS.md) doit être affichée après une connexion ou
+  /// une inscription réussie, sans jamais l'afficher si ce nombre est nul.
+  Future<int> countLocalOnlyBookmarks() {
+    return _localDatasource.countWithoutUser();
+  }
+
+  /// Associe rétroactivement à [userId] tous les bookmarks locaux pas
+  /// encore liés à un compte (`userId == null`), et force `isSynced: false`
+  /// sur chacun pour que `SyncService` (Tâche 9, voir DECISIONS.md) les
+  /// prenne en charge à son prochain passage — cette méthode ne duplique pas
+  /// sa logique de push, elle se contente de les rendre éligibles.
+  ///
+  /// N'est appelée qu'après confirmation explicite de l'utilisateur (voir
+  /// `promptToLinkLocalBookmarks`, Tâche 28) — jamais automatiquement.
+  /// Écriture du lot entier dans une unique transaction Isar, même
+  /// mécanisme que [deleteBookmarks]/[addTagsToBookmarks] (voir doc de
+  /// classe).
+  Future<void> linkLocalBookmarksToUser(String userId) async {
+    await _isar.writeTxn(() async {
+      final entities = await _localDatasource.getAllWithoutUser();
+      for (final entity in entities) {
+        entity
+          ..userId = userId
+          ..isSynced = false;
+        await _isar.bookmarkEntitys.put(entity);
+      }
+    });
   }
 
   /// Démasque tous les bookmarks actuellement `isHidden: true` (flux "Code
