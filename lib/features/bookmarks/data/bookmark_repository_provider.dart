@@ -54,5 +54,6 @@ Future<BookmarkRepository> bookmarkRepository(Ref ref) async {
   return BookmarkRepository(
     localDatasource: BookmarkLocalDatasource(isar),
     remoteDatasource: BookmarkRemoteDatasource(SupabaseService.client),
+    tagLocalDatasource: TagLocalDatasource(isar),
   );
 }

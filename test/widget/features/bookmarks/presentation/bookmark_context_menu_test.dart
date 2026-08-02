@@ -12,6 +12,7 @@ import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_context_menu.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 import 'package:runk/features/tags/data/tag_repository.dart';
 import 'package:runk/features/tags/data/tag_repository_provider.dart';
 
@@ -27,6 +28,9 @@ class _FakeTagRepository implements TagRepository {
   Future<List<String>> getManagedTagNames() async => const [];
 
   @override
+  Future<List<String>> getHiddenTagNames() async => const [];
+
+  @override
   Future<void> createTag(String name) => throw UnimplementedError();
 
   @override
@@ -38,6 +42,12 @@ class _FakeTagRepository implements TagRepository {
 
   @override
   Future<void> deleteTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> hideTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> unhideTag(String name) => throw UnimplementedError();
 }
 
 void main() {
@@ -52,7 +62,7 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
@@ -65,6 +75,7 @@ void main() {
     repository = BookmarkRepository(
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
+      tagLocalDatasource: TagLocalDatasource(isar),
     );
   });
 

@@ -8,6 +8,7 @@ import 'package:runk/core/models/video_source.dart';
 import 'package:runk/features/bookmarks/data/bookmark_local_datasource.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/sync_service.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 
 import 'bookmark_repository_test.dart' show FakeBookmarkRemoteDatasource;
 
@@ -15,6 +16,7 @@ void main() {
   late Directory tempDirectory;
   late Isar isar;
   late BookmarkLocalDatasource localDatasource;
+  late TagLocalDatasource tagLocalDatasource;
   late FakeBookmarkRemoteDatasource remoteDatasource;
   late BookmarkRepository repository;
   SyncService? syncService;
@@ -26,15 +28,17 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
     localDatasource = BookmarkLocalDatasource(isar);
+    tagLocalDatasource = TagLocalDatasource(isar);
     remoteDatasource = FakeBookmarkRemoteDatasource();
     repository = BookmarkRepository(
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
+      tagLocalDatasource: tagLocalDatasource,
     );
   });
 
@@ -77,37 +81,34 @@ void main() {
       },
     );
 
-    test(
-      'pousse les changements locaux en attente puis rapatrie les '
-      'changements distants, une fois authentifié',
-      () async {
-        await addPendingEntity('remote-1');
-        remoteDatasource.remoteRows['remote-2'] = {
-          'id': 'remote-2',
-          'user_id': 'user-1',
-          'url': 'https://www.tiktok.com/@user/video/2',
-          'title': 'Depuis un autre appareil',
-          'thumbnail_url': null,
-          'source': VideoSource.tiktok.name,
-          'tags': <String>[],
-          'note': null,
-          'is_partial': false,
-          'created_at': DateTime(2026).toIso8601String(),
-          'updated_at': DateTime(2026).toIso8601String(),
-        };
-        syncService = SyncService(
-          repository: repository,
-          hasActiveSession: () => true,
-          connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
-        );
+    test('pousse les changements locaux en attente puis rapatrie les '
+        'changements distants, une fois authentifié', () async {
+      await addPendingEntity('remote-1');
+      remoteDatasource.remoteRows['remote-2'] = {
+        'id': 'remote-2',
+        'user_id': 'user-1',
+        'url': 'https://www.tiktok.com/@user/video/2',
+        'title': 'Depuis un autre appareil',
+        'thumbnail_url': null,
+        'source': VideoSource.tiktok.name,
+        'tags': <String>[],
+        'note': null,
+        'is_partial': false,
+        'created_at': DateTime(2026).toIso8601String(),
+        'updated_at': DateTime(2026).toIso8601String(),
+      };
+      syncService = SyncService(
+        repository: repository,
+        hasActiveSession: () => true,
+        connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
+      );
 
-        await syncService!.syncNow();
+      await syncService!.syncNow();
 
-        expect(remoteDatasource.upsertedRows, hasLength(1));
-        final bookmarks = await repository.getAllBookmarks();
-        expect(bookmarks.map((b) => b.id), containsAll(['remote-1', 'remote-2']));
-      },
-    );
+      expect(remoteDatasource.upsertedRows, hasLength(1));
+      final bookmarks = await repository.getAllBookmarks();
+      expect(bookmarks.map((b) => b.id), containsAll(['remote-1', 'remote-2']));
+    });
 
     test('ne relance pas une synchronisation déjà en cours', () async {
       await addPendingEntity('remote-1');
@@ -129,6 +130,7 @@ void main() {
       final slowRepository = BookmarkRepository(
         localDatasource: localDatasource,
         remoteDatasource: slowRemote,
+        tagLocalDatasource: tagLocalDatasource,
       );
       syncService = SyncService(
         repository: slowRepository,
@@ -187,7 +189,8 @@ void main() {
       // — voir BUGS_AND_ROADMAP.md, section "Points de vigilance techniques
       // identifiés", entrée Tâche 10, pour le détail et l'hypothèse de
       // cause. À reprendre comme bug dédié, ne pas supprimer ce test.
-      skip: 'Voir BUGS_AND_ROADMAP.md, entrée Tâche 10 (flaky en suite complète).',
+      skip:
+          'Voir BUGS_AND_ROADMAP.md, entrée Tâche 10 (flaky en suite complète).',
     );
 
     test('dispose() arrête toute synchronisation ultérieure', () async {
@@ -214,7 +217,8 @@ void main() {
 /// de vérifier que `SyncService` ne lance jamais deux synchronisations en
 /// parallèle (voir `SyncService._isSyncing`). N'introduit aucune nouvelle
 /// dépendance de mocking (voir DECISIONS.md, "Mock HTTP des providers").
-class _SlowFakeBookmarkRemoteDatasource implements FakeBookmarkRemoteDatasource {
+class _SlowFakeBookmarkRemoteDatasource
+    implements FakeBookmarkRemoteDatasource {
   _SlowFakeBookmarkRemoteDatasource({
     required this.delegate,
     required this.onCallStart,

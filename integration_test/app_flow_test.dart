@@ -13,6 +13,7 @@ import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository_provider.dart';
 import 'package:runk/features/bookmarks/presentation/home_screen.dart';
 import 'package:runk/features/bookmarks/presentation/share_intent_gate.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 
 import '../test/unit/features/bookmarks/data/bookmark_repository_test.dart'
     show FakeBookmarkRemoteDatasource;
@@ -59,13 +60,14 @@ void main() {
       'runk_integration_test',
     );
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
     repository = BookmarkRepository(
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
+      tagLocalDatasource: TagLocalDatasource(isar),
     );
     fakeShareIntentService = FakeShareIntentService();
   });
@@ -90,9 +92,7 @@ void main() {
               fakeShareIntentService,
             ),
           ],
-          child: const MaterialApp(
-            home: ShareIntentGate(child: HomeScreen()),
-          ),
+          child: const MaterialApp(home: ShareIntentGate(child: HomeScreen())),
         ),
       );
       await tester.pumpAndSettle();

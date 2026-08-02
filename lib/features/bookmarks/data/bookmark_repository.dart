@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/models/video_source.dart';
+import '../../tags/data/tag_local_datasource.dart';
 import '../domain/bookmark_not_found_exception.dart';
 import '../domain/video_bookmark.dart';
 import 'bookmark_local_datasource.dart';
@@ -17,22 +18,41 @@ import 'bookmark_remote_sync_exception.dart';
 /// widget ni provider de présentation ne doit appeler directement Isar ou
 /// Supabase (voir CONVENTIONS.md section Réponses API) — uniquement via
 /// cette classe.
+///
+/// **Accès en lecture seule à `TagEntity` (Tâche 25, voir DECISIONS.md) :**
+/// [createBookmark]/[updateBookmark] consultent [TagLocalDatasource] pour
+/// savoir si l'un des tags finaux du bookmark correspond à un tag masqué
+/// (`TagEntity.isHidden == true`), et forcent alors `isHidden: true` sur le
+/// bookmark — même justification que `TagRepository` accédant déjà en
+/// écriture à `BookmarkEntity` (voir sa doc de classe, entrée « Tâche 15 ») :
+/// Isar interdit les transactions imbriquées, mais ici aucune écriture n'est
+/// faite sur `TagEntity` (responsabilité exclusive de `TagRepository`,
+/// jamais partagée) — une simple lecture, pas de composition de transaction
+/// nécessaire.
 class BookmarkRepository {
-  /// Crée le repository à partir de ses deux sources de données.
+  /// Crée le repository à partir de ses sources de données.
   BookmarkRepository({
     required BookmarkLocalDatasource localDatasource,
     required BookmarkRemoteDatasource remoteDatasource,
+    required TagLocalDatasource tagLocalDatasource,
     Uuid uuid = const Uuid(),
   }) : _localDatasource = localDatasource,
        _remoteDatasource = remoteDatasource,
+       _tagLocalDatasource = tagLocalDatasource,
        _uuid = uuid;
 
   final BookmarkLocalDatasource _localDatasource;
   final BookmarkRemoteDatasource _remoteDatasource;
+  final TagLocalDatasource _tagLocalDatasource;
   final Uuid _uuid;
 
   /// Crée un nouveau bookmark : écriture locale immédiate (identifiant
   /// généré côté client), puis tentative de synchronisation distante.
+  ///
+  /// Si l'un de [tags] correspond à un tag masqué (`TagEntity.isHidden ==
+  /// true`, Tâche 25, voir DECISIONS.md et doc de classe), le bookmark est
+  /// créé directement `isHidden: true` — aucune action supplémentaire de
+  /// l'utilisateur requise.
   Future<VideoBookmark> createBookmark({
     required String url,
     required String title,
@@ -43,6 +63,7 @@ class BookmarkRepository {
     String? note,
   }) async {
     final now = DateTime.now();
+    final hasHiddenTag = await _tagLocalDatasource.hasAnyHiddenTag(tags);
     final entity = BookmarkEntity()
       ..remoteId = _uuid.v4()
       ..url = url
@@ -50,7 +71,7 @@ class BookmarkRepository {
       ..thumbnailUrl = thumbnailUrl
       ..source = source.name
       ..isPartial = isPartial
-      ..isHidden = false
+      ..isHidden = hasHiddenTag
       ..tags = tags
       ..note = note
       ..createdAt = now
@@ -74,6 +95,12 @@ class BookmarkRepository {
   /// Met à jour un bookmark existant (titre, tags, note, etc.) : écriture
   /// locale immédiate, puis tentative de synchronisation distante.
   ///
+  /// Si l'un de [bookmark.tags] correspond à un tag masqué
+  /// (`TagEntity.isHidden == true`, Tâche 25, voir DECISIONS.md et doc de
+  /// classe), `isHidden: true` est forcé quelle que soit la valeur fournie
+  /// par l'appelant — s'applique donc aussi bien à l'ajout d'un tag masqué
+  /// via "Modifier les tags" (Tâche 21) qu'à toute autre modification.
+  ///
   /// Lève [BookmarkNotFoundException] si [bookmark.id] ne correspond à
   /// aucune entité locale.
   Future<VideoBookmark> updateBookmark(VideoBookmark bookmark) async {
@@ -82,13 +109,17 @@ class BookmarkRepository {
       throw BookmarkNotFoundException(bookmark.id);
     }
 
+    final hasHiddenTag = await _tagLocalDatasource.hasAnyHiddenTag(
+      bookmark.tags,
+    );
+
     entity
       ..url = bookmark.url
       ..title = bookmark.title
       ..thumbnailUrl = bookmark.thumbnailUrl
       ..source = bookmark.source.name
       ..isPartial = bookmark.isPartial
-      ..isHidden = bookmark.isHidden
+      ..isHidden = hasHiddenTag || bookmark.isHidden
       ..tags = bookmark.tags
       ..note = bookmark.note
       ..updatedAt = DateTime.now()

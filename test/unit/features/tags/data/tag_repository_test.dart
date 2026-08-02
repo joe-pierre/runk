@@ -155,9 +155,82 @@ void main() {
       expect(await repository.countBookmarksForTag('inexistant'), 0);
     });
 
+    test('retire le tag (cascade) de tous les bookmarks concernés et supprime '
+        'le TagEntity', () async {
+      await repository.createTag('voyage');
+      await _seedBookmark(
+        bookmarkLocalDatasource,
+        remoteId: 'b1',
+        tags: const ['voyage'],
+      );
+      await _seedBookmark(
+        bookmarkLocalDatasource,
+        remoteId: 'b2',
+        tags: const ['voyage', 'plage'],
+      );
+      await _seedBookmark(
+        bookmarkLocalDatasource,
+        remoteId: 'b3',
+        tags: const ['plage'],
+      );
+
+      await repository.deleteTag('voyage');
+
+      expect(await tagLocalDatasource.findByName('voyage'), isNull);
+      final b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
+      final b2 = await bookmarkLocalDatasource.findByRemoteId('b2');
+      final b3 = await bookmarkLocalDatasource.findByRemoteId('b3');
+      expect(b1!.tags, isEmpty);
+      expect(b2!.tags, ['plage']);
+      expect(b3!.tags, ['plage']);
+    });
+
+    test('supprimer un tag purement dérivé (sans TagEntity) le retire quand '
+        'même de tous les bookmarks', () async {
+      await _seedBookmark(
+        bookmarkLocalDatasource,
+        remoteId: 'b1',
+        tags: const ['brouillon'],
+      );
+
+      await repository.deleteTag('brouillon');
+
+      final b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
+      expect(b1!.tags, isEmpty);
+    });
+  });
+
+  group('hideTag (Tâche 25 — My Eyes Only, tags)', () {
     test(
-      'retire le tag (cascade) de tous les bookmarks concernés et supprime '
-      'le TagEntity',
+      'masque un tag purement dérivé (crée son TagEntity) et tous les '
+      'bookmarks qui le portent, comparaison insensible à la casse',
+      () async {
+        await _seedBookmark(
+          bookmarkLocalDatasource,
+          remoteId: 'b1',
+          tags: const ['Secret', 'autre'],
+        );
+        await _seedBookmark(
+          bookmarkLocalDatasource,
+          remoteId: 'b2',
+          tags: const ['autre'],
+        );
+        expect(await tagLocalDatasource.findByName('secret'), isNull);
+
+        await repository.hideTag('secret');
+
+        final tagEntity = await tagLocalDatasource.findByName('secret');
+        expect(tagEntity, isNotNull);
+        expect(tagEntity!.isHidden, isTrue);
+        final b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
+        final b2 = await bookmarkLocalDatasource.findByRemoteId('b2');
+        expect(b1!.isHidden, isTrue);
+        expect(b2!.isHidden, isFalse);
+      },
+    );
+
+    test(
+      'masque un tag déjà géré (TagEntity existant) sans le dupliquer',
       () async {
         await repository.createTag('voyage');
         await _seedBookmark(
@@ -165,43 +238,70 @@ void main() {
           remoteId: 'b1',
           tags: const ['voyage'],
         );
-        await _seedBookmark(
-          bookmarkLocalDatasource,
-          remoteId: 'b2',
-          tags: const ['voyage', 'plage'],
-        );
-        await _seedBookmark(
-          bookmarkLocalDatasource,
-          remoteId: 'b3',
-          tags: const ['plage'],
-        );
 
-        await repository.deleteTag('voyage');
+        await repository.hideTag('voyage');
 
-        expect(await tagLocalDatasource.findByName('voyage'), isNull);
+        expect(await repository.getHiddenTagNames(), ['voyage']);
         final b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
-        final b2 = await bookmarkLocalDatasource.findByRemoteId('b2');
-        final b3 = await bookmarkLocalDatasource.findByRemoteId('b3');
-        expect(b1!.tags, isEmpty);
-        expect(b2!.tags, ['plage']);
-        expect(b3!.tags, ['plage']);
+        expect(b1!.isHidden, isTrue);
       },
     );
 
+    test('getManagedTagNames exclut les tags masqués, getHiddenTagNames ne '
+        'retourne qu\'eux', () async {
+      await repository.createTag('a');
+      await repository.createTag('b');
+
+      await repository.hideTag('b');
+
+      expect(await repository.getManagedTagNames(), ['a']);
+      expect(await repository.getHiddenTagNames(), ['b']);
+    });
+  });
+
+  group('unhideTag (Tâche 25 — My Eyes Only, tags)', () {
     test(
-      'supprimer un tag purement dérivé (sans TagEntity) le retire quand '
-      'même de tous les bookmarks',
+      'démasque le TagEntity et tous les bookmarks qui le portent',
       () async {
         await _seedBookmark(
           bookmarkLocalDatasource,
           remoteId: 'b1',
-          tags: const ['brouillon'],
+          tags: const ['secret'],
+        );
+        await repository.hideTag('secret');
+
+        await repository.unhideTag('secret');
+
+        final tagEntity = await tagLocalDatasource.findByName('secret');
+        expect(tagEntity!.isHidden, isFalse);
+        expect(await repository.getManagedTagNames(), ['secret']);
+        final b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
+        expect(b1!.isHidden, isFalse);
+      },
+    );
+
+    test(
+      'ne démasque pas un bookmark qui porte encore un autre tag masqué',
+      () async {
+        await _seedBookmark(
+          bookmarkLocalDatasource,
+          remoteId: 'b1',
+          tags: const ['secret1', 'secret2'],
+        );
+        await repository.hideTag('secret1');
+        await repository.hideTag('secret2');
+
+        await repository.unhideTag('secret1');
+        var b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
+        expect(
+          b1!.isHidden,
+          isTrue,
+          reason: 'secret2 masque encore ce bookmark',
         );
 
-        await repository.deleteTag('brouillon');
-
-        final b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
-        expect(b1!.tags, isEmpty);
+        await repository.unhideTag('secret2');
+        b1 = await bookmarkLocalDatasource.findByRemoteId('b1');
+        expect(b1!.isHidden, isFalse);
       },
     );
   });

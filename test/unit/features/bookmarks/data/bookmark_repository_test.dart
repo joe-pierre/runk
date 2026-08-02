@@ -8,6 +8,7 @@ import 'package:runk/features/bookmarks/data/bookmark_remote_datasource.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/domain/bookmark_not_found_exception.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 
 /// Fake du datasource distant : n'effectue jamais d'appel Supabase réel.
 /// Permet de vérifier le comportement offline-first de `BookmarkRepository`
@@ -83,6 +84,7 @@ void main() {
   late Directory tempDirectory;
   late Isar isar;
   late BookmarkLocalDatasource localDatasource;
+  late TagLocalDatasource tagLocalDatasource;
   late FakeBookmarkRemoteDatasource remoteDatasource;
   late BookmarkRepository repository;
 
@@ -93,15 +95,17 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
     localDatasource = BookmarkLocalDatasource(isar);
+    tagLocalDatasource = TagLocalDatasource(isar);
     remoteDatasource = FakeBookmarkRemoteDatasource();
     repository = BookmarkRepository(
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
+      tagLocalDatasource: tagLocalDatasource,
     );
   });
 
@@ -214,50 +218,44 @@ void main() {
       expect(created.isHidden, isFalse);
     });
 
-    test(
-      'updateBookmark persiste isHidden: true, et il est bien restitué par '
-      'getAllBookmarks',
-      () async {
-        final created = await repository.createBookmark(
-          url: 'https://www.youtube.com/watch?v=abc',
-          title: 'Vidéo',
-          source: VideoSource.youtube,
-        );
+    test('updateBookmark persiste isHidden: true, et il est bien restitué par '
+        'getAllBookmarks', () async {
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Vidéo',
+        source: VideoSource.youtube,
+      );
 
-        await repository.updateBookmark(created.copyWith(isHidden: true));
+      await repository.updateBookmark(created.copyWith(isHidden: true));
 
-        final bookmarks = await repository.getAllBookmarks();
-        expect(bookmarks.single.isHidden, isTrue);
-      },
-    );
+      final bookmarks = await repository.getAllBookmarks();
+      expect(bookmarks.single.isHidden, isTrue);
+    });
 
-    test(
-      'unhideAllBookmarks démasque tous les bookmarks masqués sans toucher '
-      'aux autres, ni les supprimer',
-      () async {
-        final hidden = await repository.createBookmark(
-          url: 'https://www.youtube.com/watch?v=hidden',
-          title: 'Masqué',
-          source: VideoSource.youtube,
-        );
-        final visible = await repository.createBookmark(
-          url: 'https://www.youtube.com/watch?v=visible',
-          title: 'Visible',
-          source: VideoSource.youtube,
-        );
-        await repository.updateBookmark(hidden.copyWith(isHidden: true));
+    test('unhideAllBookmarks démasque tous les bookmarks masqués sans toucher '
+        'aux autres, ni les supprimer', () async {
+      final hidden = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=hidden',
+        title: 'Masqué',
+        source: VideoSource.youtube,
+      );
+      final visible = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=visible',
+        title: 'Visible',
+        source: VideoSource.youtube,
+      );
+      await repository.updateBookmark(hidden.copyWith(isHidden: true));
 
-        await repository.unhideAllBookmarks();
+      await repository.unhideAllBookmarks();
 
-        final bookmarks = await repository.getAllBookmarks();
-        expect(bookmarks, hasLength(2));
-        expect(bookmarks.every((bookmark) => !bookmark.isHidden), isTrue);
-        expect(
-          bookmarks.map((bookmark) => bookmark.id),
-          containsAll([hidden.id, visible.id]),
-        );
-      },
-    );
+      final bookmarks = await repository.getAllBookmarks();
+      expect(bookmarks, hasLength(2));
+      expect(bookmarks.every((bookmark) => !bookmark.isHidden), isTrue);
+      expect(
+        bookmarks.map((bookmark) => bookmark.id),
+        containsAll([hidden.id, visible.id]),
+      );
+    });
 
     test(
       'is_hidden est bien mappé vers/depuis la ligne distante Supabase',
@@ -292,32 +290,97 @@ void main() {
     );
   });
 
+  group('isHidden via un tag masqué (Tâche 25 — My Eyes Only, tags)', () {
+    test('un bookmark créé avec un tag masqué est automatiquement isHidden: '
+        'true, sans action supplémentaire', () async {
+      await tagLocalDatasource.upsert(
+        TagEntity()
+          ..name = 'secret'
+          ..isHidden = true,
+      );
+
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Vidéo',
+        source: VideoSource.youtube,
+        tags: const ['secret', 'autre'],
+      );
+
+      expect(created.isHidden, isTrue);
+    });
+
+    test('ajouter un tag masqué à un bookmark existant via updateBookmark le '
+        'masque automatiquement, même si isHidden: false est fourni '
+        'explicitement (extension de "Modifier les tags", Tâche 21)', () async {
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Vidéo',
+        source: VideoSource.youtube,
+        tags: const ['public'],
+      );
+      expect(created.isHidden, isFalse);
+      await tagLocalDatasource.upsert(
+        TagEntity()
+          ..name = 'secret'
+          ..isHidden = true,
+      );
+
+      final updated = await repository.updateBookmark(
+        created.copyWith(tags: const ['public', 'secret'], isHidden: false),
+      );
+
+      expect(updated.isHidden, isTrue);
+      final bookmarks = await repository.getAllBookmarks();
+      expect(bookmarks.single.isHidden, isTrue);
+    });
+
+    test('retirer le tag masqué d\'un bookmark ne le démasque pas '
+        'automatiquement (aucun mécanisme ne distingue pourquoi il est '
+        'masqué, voir DECISIONS.md)', () async {
+      await tagLocalDatasource.upsert(
+        TagEntity()
+          ..name = 'secret'
+          ..isHidden = true,
+      );
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Vidéo',
+        source: VideoSource.youtube,
+        tags: const ['secret'],
+      );
+      expect(created.isHidden, isTrue);
+
+      final updated = await repository.updateBookmark(
+        created.copyWith(tags: const []),
+      );
+
+      expect(updated.isHidden, isTrue);
+    });
+  });
+
   group('syncPendingChanges', () {
-    test(
-      'pousse via upsert une entité en attente appartenant à un utilisateur '
-      'authentifié, puis la marque isSynced',
-      () async {
-        final entity = BookmarkEntity()
-          ..remoteId = 'remote-1'
-          ..userId = 'user-1'
-          ..url = 'https://www.youtube.com/watch?v=abc'
-          ..title = 'Vidéo en attente'
-          ..source = VideoSource.youtube.name
-          ..tags = const []
-          ..createdAt = DateTime(2026)
-          ..updatedAt = DateTime(2026)
-          ..isSynced = false
-          ..isDeletedLocally = false;
-        await localDatasource.upsert(entity);
+    test('pousse via upsert une entité en attente appartenant à un utilisateur '
+        'authentifié, puis la marque isSynced', () async {
+      final entity = BookmarkEntity()
+        ..remoteId = 'remote-1'
+        ..userId = 'user-1'
+        ..url = 'https://www.youtube.com/watch?v=abc'
+        ..title = 'Vidéo en attente'
+        ..source = VideoSource.youtube.name
+        ..tags = const []
+        ..createdAt = DateTime(2026)
+        ..updatedAt = DateTime(2026)
+        ..isSynced = false
+        ..isDeletedLocally = false;
+      await localDatasource.upsert(entity);
 
-        await repository.syncPendingChanges();
+      await repository.syncPendingChanges();
 
-        expect(remoteDatasource.upsertedRows, hasLength(1));
-        expect(remoteDatasource.upsertedRows.single['id'], 'remote-1');
-        final synced = await localDatasource.findByRemoteId('remote-1');
-        expect(synced!.isSynced, isTrue);
-      },
-    );
+      expect(remoteDatasource.upsertedRows, hasLength(1));
+      expect(remoteDatasource.upsertedRows.single['id'], 'remote-1');
+      final synced = await localDatasource.findByRemoteId('remote-1');
+      expect(synced!.isSynced, isTrue);
+    });
 
     test(
       'ignore les entités sans utilisateur authentifié (userId == null)',
@@ -340,44 +403,41 @@ void main() {
       },
     );
 
-    test(
-      'traite les suppressions en attente avant tout autre envoi '
-      '(voir SPEC.md section 13)',
-      () async {
-        final toDelete = BookmarkEntity()
-          ..remoteId = 'remote-delete'
-          ..userId = 'user-1'
-          ..url = 'https://www.youtube.com/watch?v=del'
-          ..title = 'À supprimer'
-          ..source = VideoSource.youtube.name
-          ..tags = const []
-          ..createdAt = DateTime(2026)
-          ..updatedAt = DateTime(2026)
-          ..isSynced = true
-          ..isDeletedLocally = true;
-        final toUpload = BookmarkEntity()
-          ..remoteId = 'remote-upload'
-          ..userId = 'user-1'
-          ..url = 'https://www.youtube.com/watch?v=up'
-          ..title = 'À envoyer'
-          ..source = VideoSource.youtube.name
-          ..tags = const []
-          ..createdAt = DateTime(2026)
-          ..updatedAt = DateTime(2026)
-          ..isSynced = false
-          ..isDeletedLocally = false;
-        await localDatasource.upsert(toDelete);
-        await localDatasource.upsert(toUpload);
+    test('traite les suppressions en attente avant tout autre envoi '
+        '(voir SPEC.md section 13)', () async {
+      final toDelete = BookmarkEntity()
+        ..remoteId = 'remote-delete'
+        ..userId = 'user-1'
+        ..url = 'https://www.youtube.com/watch?v=del'
+        ..title = 'À supprimer'
+        ..source = VideoSource.youtube.name
+        ..tags = const []
+        ..createdAt = DateTime(2026)
+        ..updatedAt = DateTime(2026)
+        ..isSynced = true
+        ..isDeletedLocally = true;
+      final toUpload = BookmarkEntity()
+        ..remoteId = 'remote-upload'
+        ..userId = 'user-1'
+        ..url = 'https://www.youtube.com/watch?v=up'
+        ..title = 'À envoyer'
+        ..source = VideoSource.youtube.name
+        ..tags = const []
+        ..createdAt = DateTime(2026)
+        ..updatedAt = DateTime(2026)
+        ..isSynced = false
+        ..isDeletedLocally = false;
+      await localDatasource.upsert(toDelete);
+      await localDatasource.upsert(toUpload);
 
-        await repository.syncPendingChanges();
+      await repository.syncPendingChanges();
 
-        expect(remoteDatasource.callOrder, [
-          'delete:remote-delete',
-          'upsert:remote-upload',
-        ]);
-        expect(await localDatasource.findByRemoteId('remote-delete'), isNull);
-      },
-    );
+      expect(remoteDatasource.callOrder, [
+        'delete:remote-delete',
+        'upsert:remote-upload',
+      ]);
+      expect(await localDatasource.findByRemoteId('remote-delete'), isNull);
+    });
   });
 
   group('pullRemoteChanges', () {
@@ -407,91 +467,88 @@ void main() {
       },
     );
 
-    test(
-      'une ligne distante plus récente écrase la copie locale '
-      '(last-write-wins, voir SPEC.md section 13)',
-      () async {
-        final localEntity = BookmarkEntity()
-          ..remoteId = 'remote-3'
-          ..userId = 'user-1'
-          ..url = 'https://www.youtube.com/watch?v=abc'
-          ..title = 'Ancien titre'
-          ..source = VideoSource.youtube.name
-          ..tags = const []
-          ..createdAt = DateTime(2026)
-          ..updatedAt = DateTime(2026)
-          ..isSynced = true
-          ..isDeletedLocally = false;
-        await localDatasource.upsert(localEntity);
+    test('une ligne distante plus récente écrase la copie locale '
+        '(last-write-wins, voir SPEC.md section 13)', () async {
+      final localEntity = BookmarkEntity()
+        ..remoteId = 'remote-3'
+        ..userId = 'user-1'
+        ..url = 'https://www.youtube.com/watch?v=abc'
+        ..title = 'Ancien titre'
+        ..source = VideoSource.youtube.name
+        ..tags = const []
+        ..createdAt = DateTime(2026)
+        ..updatedAt = DateTime(2026)
+        ..isSynced = true
+        ..isDeletedLocally = false;
+      await localDatasource.upsert(localEntity);
 
-        remoteDatasource.remoteRows['remote-3'] = {
-          'id': 'remote-3',
-          'user_id': 'user-1',
-          'url': 'https://www.youtube.com/watch?v=abc',
-          'title': 'Titre modifié ailleurs',
-          'thumbnail_url': null,
-          'source': VideoSource.youtube.name,
-          'tags': <String>[],
-          'note': null,
-          'is_partial': false,
-          'created_at': DateTime(2026).toIso8601String(),
-          'updated_at': DateTime(2026, 1, 2).toIso8601String(),
-        };
+      remoteDatasource.remoteRows['remote-3'] = {
+        'id': 'remote-3',
+        'user_id': 'user-1',
+        'url': 'https://www.youtube.com/watch?v=abc',
+        'title': 'Titre modifié ailleurs',
+        'thumbnail_url': null,
+        'source': VideoSource.youtube.name,
+        'tags': <String>[],
+        'note': null,
+        'is_partial': false,
+        'created_at': DateTime(2026).toIso8601String(),
+        'updated_at': DateTime(2026, 1, 2).toIso8601String(),
+      };
 
-        await repository.pullRemoteChanges();
+      await repository.pullRemoteChanges();
 
-        final updated = await localDatasource.findByRemoteId('remote-3');
-        expect(updated!.title, 'Titre modifié ailleurs');
-      },
-    );
+      final updated = await localDatasource.findByRemoteId('remote-3');
+      expect(updated!.title, 'Titre modifié ailleurs');
+    });
 
-    test(
-      'supprime localement un bookmark déjà synchronisé mais supprimé sur '
-      'un autre appareil',
-      () async {
-        final localEntity = BookmarkEntity()
-          ..remoteId = 'remote-4'
-          ..userId = 'user-1'
-          ..url = 'https://www.youtube.com/watch?v=gone'
-          ..title = 'Supprimé ailleurs'
-          ..source = VideoSource.youtube.name
-          ..tags = const []
-          ..createdAt = DateTime(2026)
-          ..updatedAt = DateTime(2026)
-          ..isSynced = true
-          ..isDeletedLocally = false;
-        await localDatasource.upsert(localEntity);
+    test('supprime localement un bookmark déjà synchronisé mais supprimé sur '
+        'un autre appareil', () async {
+      final localEntity = BookmarkEntity()
+        ..remoteId = 'remote-4'
+        ..userId = 'user-1'
+        ..url = 'https://www.youtube.com/watch?v=gone'
+        ..title = 'Supprimé ailleurs'
+        ..source = VideoSource.youtube.name
+        ..tags = const []
+        ..createdAt = DateTime(2026)
+        ..updatedAt = DateTime(2026)
+        ..isSynced = true
+        ..isDeletedLocally = false;
+      await localDatasource.upsert(localEntity);
 
-        await repository.pullRemoteChanges();
+      await repository.pullRemoteChanges();
 
-        expect(await localDatasource.findByRemoteId('remote-4'), isNull);
-      },
-    );
+      expect(await localDatasource.findByRemoteId('remote-4'), isNull);
+    });
   });
 
   group('searchBookmarks', () {
-    test('trouve un bookmark par titre ou par tag, jamais via le réseau', () async {
-      await repository.createBookmark(
-        url: 'https://www.youtube.com/watch?v=abc',
-        title: 'Recette de cuisine',
-        source: VideoSource.youtube,
-        tags: const ['cuisine'],
-      );
-      await repository.createBookmark(
-        url: 'https://www.youtube.com/watch?v=xyz',
-        title: 'Tutoriel Flutter',
-        source: VideoSource.youtube,
-        tags: const ['dev'],
-      );
+    test(
+      'trouve un bookmark par titre ou par tag, jamais via le réseau',
+      () async {
+        await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Recette de cuisine',
+          source: VideoSource.youtube,
+          tags: const ['cuisine'],
+        );
+        await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=xyz',
+          title: 'Tutoriel Flutter',
+          source: VideoSource.youtube,
+          tags: const ['dev'],
+        );
 
-      final byTitle = await repository.searchBookmarks('recette');
-      expect(byTitle.map((b) => b.title), ['Recette de cuisine']);
+        final byTitle = await repository.searchBookmarks('recette');
+        expect(byTitle.map((b) => b.title), ['Recette de cuisine']);
 
-      final byTag = await repository.searchBookmarks('dev');
-      expect(byTag.map((b) => b.title), ['Tutoriel Flutter']);
+        final byTag = await repository.searchBookmarks('dev');
+        expect(byTag.map((b) => b.title), ['Tutoriel Flutter']);
 
-      final noMatch = await repository.searchBookmarks('inexistant');
-      expect(noMatch, isEmpty);
-    });
+        final noMatch = await repository.searchBookmarks('inexistant');
+        expect(noMatch, isEmpty);
+      },
+    );
   });
 }

@@ -8,8 +8,10 @@ import 'package:runk/features/bookmarks/data/bookmark_local_datasource.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository_provider.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_search_provider.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 
-import '../data/bookmark_repository_test.dart' show FakeBookmarkRemoteDatasource;
+import '../data/bookmark_repository_test.dart'
+    show FakeBookmarkRemoteDatasource;
 
 void main() {
   late Directory tempDirectory;
@@ -24,13 +26,14 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
     repository = BookmarkRepository(
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
+      tagLocalDatasource: TagLocalDatasource(isar),
     );
     container = ProviderContainer(
       overrides: [
@@ -45,47 +48,50 @@ void main() {
     tempDirectory.deleteSync(recursive: true);
   });
 
-  test('une requête vide retourne une liste vide sans appeler le repository', () async {
-    final results = await container.read(bookmarkSearchProvider('').future);
-    expect(results, isEmpty);
-  });
-
-  test('délègue au repository et retourne les résultats correspondants', () async {
-    await repository.createBookmark(
-      url: 'https://www.youtube.com/watch?v=abc',
-      title: 'Recette de cuisine',
-      source: VideoSource.youtube,
-      tags: const ['cuisine'],
-    );
-
-    final results = await container.read(
-      bookmarkSearchProvider('recette').future,
-    );
-
-    expect(results.map((b) => b.title), ['Recette de cuisine']);
-  });
-
   test(
-    'exclut un bookmark "My Eyes Only" des résultats, même sans code saisi '
-    'dans la session',
+    'une requête vide retourne une liste vide sans appeler le repository',
     () async {
-      final bookmark = await repository.createBookmark(
-        url: 'https://www.youtube.com/watch?v=hidden',
-        title: 'Recette secrète',
-        source: VideoSource.youtube,
-        tags: const ['secret'],
-      );
-      await repository.updateBookmark(bookmark.copyWith(isHidden: true));
-
-      final resultsByTitle = await container.read(
-        bookmarkSearchProvider('recette').future,
-      );
-      final resultsByTag = await container.read(
-        bookmarkSearchProvider('secret').future,
-      );
-
-      expect(resultsByTitle, isEmpty);
-      expect(resultsByTag, isEmpty);
+      final results = await container.read(bookmarkSearchProvider('').future);
+      expect(results, isEmpty);
     },
   );
+
+  test(
+    'délègue au repository et retourne les résultats correspondants',
+    () async {
+      await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=abc',
+        title: 'Recette de cuisine',
+        source: VideoSource.youtube,
+        tags: const ['cuisine'],
+      );
+
+      final results = await container.read(
+        bookmarkSearchProvider('recette').future,
+      );
+
+      expect(results.map((b) => b.title), ['Recette de cuisine']);
+    },
+  );
+
+  test('exclut un bookmark "My Eyes Only" des résultats, même sans code saisi '
+      'dans la session', () async {
+    final bookmark = await repository.createBookmark(
+      url: 'https://www.youtube.com/watch?v=hidden',
+      title: 'Recette secrète',
+      source: VideoSource.youtube,
+      tags: const ['secret'],
+    );
+    await repository.updateBookmark(bookmark.copyWith(isHidden: true));
+
+    final resultsByTitle = await container.read(
+      bookmarkSearchProvider('recette').future,
+    );
+    final resultsByTag = await container.read(
+      bookmarkSearchProvider('secret').future,
+    );
+
+    expect(resultsByTitle, isEmpty);
+    expect(resultsByTag, isEmpty);
+  });
 }

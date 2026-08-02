@@ -14,9 +14,20 @@ part of 'distinct_tags_provider.dart';
 ///
 /// Fusionne deux sources (voir DECISIONS.md, entrée « Tâche 15 ») :
 /// - les tags **dérivés** de [bookmarkListProvider] (portés par au moins un
-///   bookmark, comme avant la Tâche 15) ;
+///   bookmark **visible**, `isHidden == false` — voir ci-dessous) ;
 /// - les tags **gérés** via `TagRepository` (un `TagEntity` peut exister
-///   sans aucun bookmark associé).
+///   sans aucun bookmark associé), déjà filtrés sur `isHidden == false` par
+///   `TagRepository.getManagedTagNames()`.
+///
+/// **Exclusion des tags masqués (Tâche 25, corrige un bug préexistant
+/// documenté en Tâche 23) :** avant cette tâche, les tags étaient dérivés de
+/// *tous* les bookmarks retournés par [bookmarkListProvider], y compris ceux
+/// `isHidden == true` — un tag porté uniquement par des bookmarks masqués
+/// apparaissait donc dans `TagsScreen`/l'autocomplétion, révélant l'existence
+/// d'un bookmark masqué sans le code "My Eyes Only" (voir DECISIONS.md,
+/// entrée « Tâche 23 »). Filtré ici sur `!bookmark.isHidden` avant dérivation
+/// — en plus du filtrage des `TagEntity.isHidden == true` eux-mêmes,
+/// désormais géré par `TagRepository.getManagedTagNames()`.
 ///
 /// Déduplication insensible à la casse (cohérent avec `TagInputField`,
 /// DECISIONS.md entrée « Tâche 13 ») ; en cas de collision, la casse
@@ -36,9 +47,20 @@ final distinctTagsProvider = DistinctTagsProvider._();
 ///
 /// Fusionne deux sources (voir DECISIONS.md, entrée « Tâche 15 ») :
 /// - les tags **dérivés** de [bookmarkListProvider] (portés par au moins un
-///   bookmark, comme avant la Tâche 15) ;
+///   bookmark **visible**, `isHidden == false` — voir ci-dessous) ;
 /// - les tags **gérés** via `TagRepository` (un `TagEntity` peut exister
-///   sans aucun bookmark associé).
+///   sans aucun bookmark associé), déjà filtrés sur `isHidden == false` par
+///   `TagRepository.getManagedTagNames()`.
+///
+/// **Exclusion des tags masqués (Tâche 25, corrige un bug préexistant
+/// documenté en Tâche 23) :** avant cette tâche, les tags étaient dérivés de
+/// *tous* les bookmarks retournés par [bookmarkListProvider], y compris ceux
+/// `isHidden == true` — un tag porté uniquement par des bookmarks masqués
+/// apparaissait donc dans `TagsScreen`/l'autocomplétion, révélant l'existence
+/// d'un bookmark masqué sans le code "My Eyes Only" (voir DECISIONS.md,
+/// entrée « Tâche 23 »). Filtré ici sur `!bookmark.isHidden` avant dérivation
+/// — en plus du filtrage des `TagEntity.isHidden == true` eux-mêmes,
+/// désormais géré par `TagRepository.getManagedTagNames()`.
 ///
 /// Déduplication insensible à la casse (cohérent avec `TagInputField`,
 /// DECISIONS.md entrée « Tâche 13 ») ; en cas de collision, la casse
@@ -63,9 +85,20 @@ final class DistinctTagsProvider
   ///
   /// Fusionne deux sources (voir DECISIONS.md, entrée « Tâche 15 ») :
   /// - les tags **dérivés** de [bookmarkListProvider] (portés par au moins un
-  ///   bookmark, comme avant la Tâche 15) ;
+  ///   bookmark **visible**, `isHidden == false` — voir ci-dessous) ;
   /// - les tags **gérés** via `TagRepository` (un `TagEntity` peut exister
-  ///   sans aucun bookmark associé).
+  ///   sans aucun bookmark associé), déjà filtrés sur `isHidden == false` par
+  ///   `TagRepository.getManagedTagNames()`.
+  ///
+  /// **Exclusion des tags masqués (Tâche 25, corrige un bug préexistant
+  /// documenté en Tâche 23) :** avant cette tâche, les tags étaient dérivés de
+  /// *tous* les bookmarks retournés par [bookmarkListProvider], y compris ceux
+  /// `isHidden == true` — un tag porté uniquement par des bookmarks masqués
+  /// apparaissait donc dans `TagsScreen`/l'autocomplétion, révélant l'existence
+  /// d'un bookmark masqué sans le code "My Eyes Only" (voir DECISIONS.md,
+  /// entrée « Tâche 23 »). Filtré ici sur `!bookmark.isHidden` avant dérivation
+  /// — en plus du filtrage des `TagEntity.isHidden == true` eux-mêmes,
+  /// désormais géré par `TagRepository.getManagedTagNames()`.
   ///
   /// Déduplication insensible à la casse (cohérent avec `TagInputField`,
   /// DECISIONS.md entrée « Tâche 13 ») ; en cas de collision, la casse
@@ -101,4 +134,4 @@ final class DistinctTagsProvider
   }
 }
 
-String _$distinctTagsHash() => r'f343e4f2a35ecc6eccd11bdf95a476d51ee36d12';
+String _$distinctTagsHash() => r'd46926e4f8190faa999cd8a0875889f451bac531';
