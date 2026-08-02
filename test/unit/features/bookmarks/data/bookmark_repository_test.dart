@@ -298,7 +298,9 @@ void main() {
       await tagLocalDatasource.upsert(
         TagEntity()
           ..name = 'secret'
-          ..isHidden = true,
+          ..isHidden = true
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026),
       );
 
       final created = await repository.createBookmark(
@@ -324,7 +326,9 @@ void main() {
       await tagLocalDatasource.upsert(
         TagEntity()
           ..name = 'secret'
-          ..isHidden = true,
+          ..isHidden = true
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026),
       );
 
       final updated = await repository.updateBookmark(
@@ -342,7 +346,9 @@ void main() {
       await tagLocalDatasource.upsert(
         TagEntity()
           ..name = 'secret'
-          ..isHidden = true,
+          ..isHidden = true
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026),
       );
       final created = await repository.createBookmark(
         url: 'https://www.youtube.com/watch?v=abc',
@@ -635,7 +641,9 @@ void main() {
       await tagLocalDatasource.upsert(
         TagEntity()
           ..name = 'secret'
-          ..isHidden = true,
+          ..isHidden = true
+          ..createdAt = DateTime(2026)
+          ..updatedAt = DateTime(2026),
       );
       final created = await repository.createBookmark(
         url: 'https://www.youtube.com/watch?v=1',

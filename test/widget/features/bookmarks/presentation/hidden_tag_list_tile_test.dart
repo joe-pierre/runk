@@ -17,6 +17,8 @@ import 'package:runk/features/tags/presentation/hidden_tags_provider.dart';
 
 import '../../../../unit/features/bookmarks/data/bookmark_repository_test.dart'
     show FakeBookmarkRemoteDatasource;
+import '../../../../unit/features/tags/data/tag_repository_test.dart'
+    show FakeTagRemoteDatasource;
 
 void main() {
   late Directory tempDirectory;
@@ -48,6 +50,8 @@ void main() {
       isar: isar,
       tagLocalDatasource: tagLocalDatasource,
       bookmarkLocalDatasource: bookmarkLocalDatasource,
+      remoteDatasource: FakeTagRemoteDatasource(),
+      getCurrentUserId: () => null,
     );
   });
 

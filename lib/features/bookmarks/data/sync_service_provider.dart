@@ -1,14 +1,16 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../../tags/data/tag_repository_provider.dart';
 import 'bookmark_repository_provider.dart';
 import 'sync_service.dart';
 
 part 'sync_service_provider.g.dart';
 
 /// Instance unique de [SyncService], construite à partir du
-/// [bookmarkRepositoryProvider] déjà exposé à la couche présentation et de
-/// l'état de session Supabase courant (`SupabaseService.client.auth`).
+/// [bookmarkRepositoryProvider] et du [tagRepositoryProvider] déjà exposés à
+/// la couche présentation, et de l'état de session Supabase courant
+/// (`SupabaseService.client.auth`).
 ///
 /// `keepAlive: true` : le service doit rester actif (abonnements réseau,
 /// minuteur périodique) pendant toute la durée de vie de l'app, démarré une
@@ -16,8 +18,10 @@ part 'sync_service_provider.g.dart';
 @Riverpod(keepAlive: true)
 Future<SyncService> syncService(Ref ref) async {
   final repository = await ref.watch(bookmarkRepositoryProvider.future);
+  final tagRepository = await ref.watch(tagRepositoryProvider.future);
   final service = SyncService(
     repository: repository,
+    tagRepository: tagRepository,
     hasActiveSession: () =>
         SupabaseService.client.auth.currentSession != null,
   );

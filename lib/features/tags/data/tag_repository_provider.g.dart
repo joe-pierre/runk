@@ -10,24 +10,30 @@ part of 'tag_repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Instance unique de [TagRepository], construite à partir de l'instance
 /// [Isar] partagée avec les bookmarks ([bookmarkIsarProvider] — voir sa doc
-/// de classe pour le détail de ce partage, DECISIONS.md entrée « Tâche 15 »).
+/// de classe pour le détail de ce partage, DECISIONS.md entrée « Tâche 15 »)
+/// et du client Supabase déjà initialisé par `SupabaseService` (même patron
+/// que `bookmarkRepositoryProvider`, voir DECISIONS.md entrées « Tâche 9 » et
+/// « Tâche 28 »).
 ///
 /// Seul point d'accès exposé à la couche présentation — aucun widget ni
 /// provider de présentation ne doit construire directement
-/// `TagLocalDatasource` ou accéder à Isar (voir CONVENTIONS.md section
-/// Réponses API).
+/// `TagLocalDatasource`/`TagRemoteDatasource` ou accéder à Isar/Supabase
+/// (voir CONVENTIONS.md section Réponses API).
 
 @ProviderFor(tagRepository)
 final tagRepositoryProvider = TagRepositoryProvider._();
 
 /// Instance unique de [TagRepository], construite à partir de l'instance
 /// [Isar] partagée avec les bookmarks ([bookmarkIsarProvider] — voir sa doc
-/// de classe pour le détail de ce partage, DECISIONS.md entrée « Tâche 15 »).
+/// de classe pour le détail de ce partage, DECISIONS.md entrée « Tâche 15 »)
+/// et du client Supabase déjà initialisé par `SupabaseService` (même patron
+/// que `bookmarkRepositoryProvider`, voir DECISIONS.md entrées « Tâche 9 » et
+/// « Tâche 28 »).
 ///
 /// Seul point d'accès exposé à la couche présentation — aucun widget ni
 /// provider de présentation ne doit construire directement
-/// `TagLocalDatasource` ou accéder à Isar (voir CONVENTIONS.md section
-/// Réponses API).
+/// `TagLocalDatasource`/`TagRemoteDatasource` ou accéder à Isar/Supabase
+/// (voir CONVENTIONS.md section Réponses API).
 
 final class TagRepositoryProvider
     extends
@@ -39,12 +45,15 @@ final class TagRepositoryProvider
     with $FutureModifier<TagRepository>, $FutureProvider<TagRepository> {
   /// Instance unique de [TagRepository], construite à partir de l'instance
   /// [Isar] partagée avec les bookmarks ([bookmarkIsarProvider] — voir sa doc
-  /// de classe pour le détail de ce partage, DECISIONS.md entrée « Tâche 15 »).
+  /// de classe pour le détail de ce partage, DECISIONS.md entrée « Tâche 15 »)
+  /// et du client Supabase déjà initialisé par `SupabaseService` (même patron
+  /// que `bookmarkRepositoryProvider`, voir DECISIONS.md entrées « Tâche 9 » et
+  /// « Tâche 28 »).
   ///
   /// Seul point d'accès exposé à la couche présentation — aucun widget ni
   /// provider de présentation ne doit construire directement
-  /// `TagLocalDatasource` ou accéder à Isar (voir CONVENTIONS.md section
-  /// Réponses API).
+  /// `TagLocalDatasource`/`TagRemoteDatasource` ou accéder à Isar/Supabase
+  /// (voir CONVENTIONS.md section Réponses API).
   TagRepositoryProvider._()
     : super(
         from: null,
@@ -71,4 +80,4 @@ final class TagRepositoryProvider
   }
 }
 
-String _$tagRepositoryHash() => r'e8286421bc1707f48f1e08ddfe47ef72726843cc';
+String _$tagRepositoryHash() => r'79a4434534772b18ecf388fb8f6eddf8b33f6733';

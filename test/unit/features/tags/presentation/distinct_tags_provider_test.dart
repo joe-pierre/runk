@@ -52,6 +52,18 @@ class _FakeTagRepository implements TagRepository {
 
   @override
   Future<void> unhideTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<int> countLocalOnlyTags() => throw UnimplementedError();
+
+  @override
+  Future<void> linkLocalTagsToUser(String userId) => throw UnimplementedError();
+
+  @override
+  Future<void> pullRemoteChanges() => throw UnimplementedError();
+
+  @override
+  Future<void> syncPendingChanges() => throw UnimplementedError();
 }
 
 VideoBookmark _bookmark({required String id, required List<String> tags}) {

@@ -11,6 +11,14 @@ part 'tag_local_datasource.g.dart';
 /// créer un tag sans bookmark associé. `TagEntity` comble ce manque, mais ne
 /// remplace pas `BookmarkEntity.tags` : les deux sources coexistent et sont
 /// fusionnées à l'affichage (voir `distinct_tags_provider.dart`).
+///
+/// **Champs de synchronisation (extension tags remote sync, voir
+/// DECISIONS.md) :** mêmes rôles que leurs homologues `BookmarkEntity` (Tâche
+/// 9/28), avec une différence pour [remoteId] — voir sa doc. [createdAt] est
+/// ajouté par cohérence avec `BookmarkEntity` et pour permettre un
+/// round-trip complet de la ligne distante (`tags.created_at`) ; il n'est
+/// utilisé par aucun tri (`TagsScreen`/`distinctTagsProvider` restent triés
+/// par ordre alphabétique, voir `distinct_tags_provider.dart`).
 @collection
 class TagEntity {
   /// Identifiant interne Isar (auto-incrémenté).
@@ -30,6 +38,37 @@ class TagEntity {
   /// `tag_action_dialogs.dart`), uniquement depuis l'espace privé déjà
   /// déverrouillé — même principe que `BookmarkEntity.isHidden` (Tâche 22).
   bool isHidden = false;
+
+  /// Correspond à `tags.id` côté Supabase. **Nullable, contrairement à
+  /// `BookmarkEntity.remoteId`** (toujours généré à la création) : cette
+  /// collection existe depuis la Tâche 15, avant cette extension de
+  /// synchronisation — un `TagEntity` créé par une version antérieure de
+  /// l'app n'a jamais eu de `remoteId`. Isar assigne la valeur par défaut du
+  /// type (`null`) aux lignes déjà persistées qui ne connaissaient pas ce
+  /// champ, exactement comme `BookmarkEntity.canonicalUrl` (Tâche 31, voir
+  /// DECISIONS.md) — aucune migration manuelle requise. `TagRepository`
+  /// génère un `remoteId` à la volée (première écriture rencontrée après
+  /// cette tâche, ou premier passage de [TagRepository.syncPendingChanges])
+  /// pour ces entités historiques.
+  @Index()
+  String? remoteId;
+
+  /// Correspond à `tags.user_id` — nullable tant qu'aucune authentification
+  /// n'existe, même raisonnement que `BookmarkEntity.userId` (voir
+  /// DECISIONS.md, entrée « Tâche 5 »).
+  String? userId;
+
+  /// `false` = en attente de synchronisation vers Supabase.
+  bool isSynced = false;
+
+  /// Suppression en attente de propagation vers Supabase (voir SPEC.md
+  /// section 13, même mécanisme que `BookmarkEntity.isDeletedLocally`) —
+  /// vérifié en priorité par `TagRepository.syncPendingChanges` avant toute
+  /// suppression distante définitive.
+  bool isDeletedLocally = false;
+
+  late DateTime createdAt;
+  late DateTime updatedAt;
 }
 
 /// Accès à la collection Isar `TagEntity`.
@@ -49,20 +88,37 @@ class TagLocalDatasource {
   final Isar _isar;
 
   /// Retourne l'entité correspondant à [name] (comparaison insensible à la
-  /// casse), ou `null` si absente. Lecture pure (aucune transaction
-  /// d'écriture ouverte) : peut être appelée aussi bien en dehors que depuis
-  /// l'intérieur d'une transaction déjà active sur la même instance [Isar]
-  /// (voir `TagRepository.renameTag`/`deleteTag`).
+  /// casse), à l'exclusion des tags marqués [TagEntity.isDeletedLocally]
+  /// (suppression en attente de confirmation distante, voir doc de classe) —
+  /// un tag en cours de suppression ne doit plus être trouvable, y compris
+  /// avant que le passage de synchronisation suivant ne le retire
+  /// définitivement. Retourne `null` si absente. Lecture pure (aucune
+  /// transaction d'écriture ouverte) : peut être appelée aussi bien en
+  /// dehors que depuis l'intérieur d'une transaction déjà active sur la même
+  /// instance [Isar] (voir `TagRepository.renameTag`/`deleteTag`).
   Future<TagEntity?> findByName(String name) {
     return _isar.tagEntitys
         .filter()
         .nameEqualTo(name, caseSensitive: false)
+        .and()
+        .isDeletedLocallyEqualTo(false)
         .findFirst();
   }
 
-  /// Retourne tous les tags gérés.
+  /// Retourne tous les tags gérés non supprimés localement (voir
+  /// [findByName] pour la même exclusion).
   Future<List<TagEntity>> getAll() {
-    return _isar.tagEntitys.where().findAll();
+    return _isar.tagEntitys.filter().isDeletedLocallyEqualTo(false).findAll();
+  }
+
+  /// Retourne l'entité correspondant à [remoteId], ou `null` si absente —
+  /// utilisé exclusivement par la synchronisation (`TagRepository`), jamais
+  /// par la présentation.
+  Future<TagEntity?> findByRemoteId(String remoteId) {
+    return _isar.tagEntitys
+        .filter()
+        .remoteIdEqualTo(remoteId)
+        .findFirst();
   }
 
   /// Insère ou remplace [entity] (upsert par [TagEntity.isarId]).
@@ -90,5 +146,69 @@ class TagLocalDatasource {
       if (entity != null && entity.isHidden) return true;
     }
     return false;
+  }
+
+  /// Retourne les entités créées/modifiées localement en attente d'envoi vers
+  /// Supabase (`isSynced: false`), à l'exclusion de celles déjà marquées pour
+  /// suppression — même rôle que `BookmarkLocalDatasource.getAllPendingUpload`
+  /// (voir sa doc), utilisé par `TagRepository.syncPendingChanges`.
+  Future<List<TagEntity>> getAllPendingUpload() {
+    return _isar.tagEntitys
+        .filter()
+        .isSyncedEqualTo(false)
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .findAll();
+  }
+
+  /// Retourne les entités marquées `isDeletedLocally: true`, dont la
+  /// suppression distante reste à confirmer — même rôle que
+  /// `BookmarkLocalDatasource.getAllPendingDeletion` (voir sa doc).
+  Future<List<TagEntity>> getAllPendingDeletion() {
+    return _isar.tagEntitys.filter().isDeletedLocallyEqualTo(true).findAll();
+  }
+
+  /// Retourne les [TagEntity.remoteId] des entités déjà confirmées
+  /// synchronisées et non supprimées localement — sert à
+  /// `TagRepository.pullRemoteChanges` pour détecter un tag supprimé sur un
+  /// autre appareil (absent des lignes distantes rapatriées, mais toujours
+  /// présent localement), même rôle que
+  /// `BookmarkLocalDatasource.getAllSyncedRemoteIds`.
+  Future<List<String>> getAllSyncedRemoteIds() async {
+    final entities = await _isar.tagEntitys
+        .filter()
+        .isSyncedEqualTo(true)
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .findAll();
+    return entities
+        .map((entity) => entity.remoteId)
+        .whereType<String>()
+        .toList();
+  }
+
+  /// Retourne les entités pas encore associées à un compte (`userId ==
+  /// null`), non supprimées localement — sert à la confirmation de
+  /// rattachement rétroactif (voir `link_local_data_prompt.dart`) et à
+  /// `TagRepository.linkLocalTagsToUser`. Même rôle que
+  /// `BookmarkLocalDatasource.getAllWithoutUser`.
+  Future<List<TagEntity>> getAllWithoutUser() {
+    return _isar.tagEntitys
+        .filter()
+        .userIdIsNull()
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .findAll();
+  }
+
+  /// Nombre d'entités que retournerait [getAllWithoutUser] — même rôle que
+  /// `BookmarkLocalDatasource.countWithoutUser`.
+  Future<int> countWithoutUser() {
+    return _isar.tagEntitys
+        .filter()
+        .userIdIsNull()
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .count();
   }
 }
