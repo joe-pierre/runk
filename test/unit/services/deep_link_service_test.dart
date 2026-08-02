@@ -30,11 +30,11 @@ void main() {
     );
 
     test(
-      'bascule vers le navigateur si aucune app ne gère le schéma natif (TikTok)',
+      'construit le schéma natif TikTok avec l\'id vidéo (lien long)',
       () async {
         final launchedUris = <Uri>[];
         final service = DeepLinkService(
-          canLaunchUrl: (uri) async => uri.scheme != 'snssdk1233',
+          canLaunchUrl: (uri) async => true,
           launchUrl: (uri, {mode = LaunchMode.platformDefault}) async {
             launchedUris.add(uri);
             return true;
@@ -42,13 +42,13 @@ void main() {
         );
 
         final opened = await service.openInSource(
-          'https://www.tiktok.com/@user/video/123',
+          'https://www.tiktok.com/@user/video/1234567890123456789',
           VideoSource.tiktok,
         );
 
         expect(opened, isTrue);
         expect(launchedUris, [
-          Uri.parse('https://www.tiktok.com/@user/video/123'),
+          Uri.parse('snssdk1233://aweme/detail/1234567890123456789?refer=web'),
         ]);
       },
     );
@@ -72,8 +72,57 @@ void main() {
 
         expect(opened, isTrue);
         expect(launchedUris, [
-          Uri.parse('twitter://x.com/user/status/123'),
+          Uri.parse('twitter://status?id=123'),
           Uri.parse('https://x.com/user/status/123'),
+        ]);
+      },
+    );
+
+    test(
+      'construit le schéma natif X/Twitter avec l\'id du statut, quel que soit l\'hôte',
+      () async {
+        for (final url in [
+          'https://twitter.com/user/status/1234567890',
+          'https://x.com/user/status/1234567890',
+          'https://mobile.twitter.com/user/status/1234567890',
+        ]) {
+          final launchedUris = <Uri>[];
+          final service = DeepLinkService(
+            canLaunchUrl: (uri) async => true,
+            launchUrl: (uri, {mode = LaunchMode.platformDefault}) async {
+              launchedUris.add(uri);
+              return true;
+            },
+          );
+
+          final opened = await service.openInSource(url, VideoSource.twitter);
+
+          expect(opened, isTrue);
+          expect(launchedUris, [Uri.parse('twitter://status?id=1234567890')]);
+        }
+      },
+    );
+
+    test(
+      'bascule vers le navigateur si le lien TikTok court n\'est pas résolu (pas d\'id extractible)',
+      () async {
+        final launchedUris = <Uri>[];
+        final service = DeepLinkService(
+          canLaunchUrl: (uri) async => true,
+          launchUrl: (uri, {mode = LaunchMode.platformDefault}) async {
+            launchedUris.add(uri);
+            return true;
+          },
+        );
+
+        final opened = await service.openInSource(
+          'https://vm.tiktok.com/ZMabcdefg/',
+          VideoSource.tiktok,
+        );
+
+        expect(opened, isTrue);
+        expect(launchedUris, [
+          Uri.parse('https://vm.tiktok.com/ZMabcdefg/'),
         ]);
       },
     );

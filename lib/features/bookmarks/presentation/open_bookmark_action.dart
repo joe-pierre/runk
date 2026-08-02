@@ -9,6 +9,11 @@ import '../domain/video_bookmark.dart';
 /// si ni le schéma natif ni le navigateur n'ont pu ouvrir la vidéo (cas
 /// extrême) — ne plante jamais l'écran appelant.
 ///
+/// Transmet `bookmark.canonicalUrl ?? bookmark.url` : pour un lien TikTok
+/// court non encore résolu en URL longue, `canonicalUrl` est `null` et le
+/// comportement reste inchangé (id vidéo introuvable, schéma natif ignoré,
+/// repli navigateur sur le lien court d'origine).
+///
 /// Utilisé par `HomeScreen` (qui affiche des `BookmarkCard` tapables) pour
 /// ne jamais dupliquer cette logique d'ouverture (voir CONVENTIONS.md, éviter
 /// la duplication entre écrans).
@@ -19,7 +24,7 @@ Future<void> openBookmark(
 ) async {
   final opened = await ref
       .read(deepLinkServiceProvider)
-      .openInSource(bookmark.url, bookmark.source);
+      .openInSource(bookmark.canonicalUrl ?? bookmark.url, bookmark.source);
   if (!opened && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Impossible d\'ouvrir cette vidéo.')),
