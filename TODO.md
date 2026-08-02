@@ -29,6 +29,7 @@
 - [x] `GenericFallbackProvider` (titre par défaut + `is_partial = true`)
 - [x] `MetadataService` (orchestrateur, sélection du provider adapté)
 - [x] Tests unitaires sur chaque provider
+- [x] Tâche 31 — Résolution de l'URL canonique TikTok (`VideoMetadata.canonicalUrl`/`VideoBookmark.canonicalUrl`/`BookmarkEntity.canonicalUrl`) : `TiktokProvider` suit désormais les redirections HTTP d'un lien court `vm.tiktok.com` (fréquent depuis TikTok Lite, voir Tâche 16) en parallèle de l'appel oEmbed, pour obtenir l'URL longue nécessaire à un futur deep link natif précis — échec/timeout de la résolution toujours silencieux (`canonicalUrl: null`), sans impact sur le comportement oEmbed existant. Seul `TiktokProvider` modifié parmi les providers (voir DECISIONS.md, entrée « Tâche 31 »). Colonne Supabase `bookmarks.canonical_url` **restant à créer manuellement par l'utilisateur** (`alter table bookmarks add column canonical_url text;`, voir DECISIONS.md) avant que la synchronisation distante de ce champ ne soit effective
 
 ## Phase 3.5 — CI et test d'intégration du flux interne
 

@@ -738,4 +738,112 @@ void main() {
       expect(await repository.countLocalOnlyBookmarks(), 0);
     });
   });
+
+  group('canonicalUrl (Tâche 31 — résolution TikTok, voir DECISIONS.md)', () {
+    test(
+      'createBookmark persiste canonicalUrl localement et le mappe vers '
+      '"canonical_url" lors de la synchronisation distante',
+      () async {
+        final authenticatedRepository = BookmarkRepository(
+          isar: isar,
+          localDatasource: localDatasource,
+          remoteDatasource: remoteDatasource,
+          tagLocalDatasource: tagLocalDatasource,
+          getCurrentUserId: () => 'user-1',
+        );
+
+        final created = await authenticatedRepository.createBookmark(
+          url: 'https://vm.tiktok.com/ZS4BB5Rc7/',
+          title: 'Vidéo TikTok',
+          source: VideoSource.tiktok,
+          canonicalUrl: 'https://www.tiktok.com/@user/video/9876543210',
+        );
+
+        expect(
+          created.canonicalUrl,
+          'https://www.tiktok.com/@user/video/9876543210',
+        );
+
+        final entity = await localDatasource.findByRemoteId(created.id);
+        expect(
+          entity!.canonicalUrl,
+          'https://www.tiktok.com/@user/video/9876543210',
+        );
+
+        expect(remoteDatasource.insertedRows, hasLength(1));
+        expect(
+          remoteDatasource.insertedRows.single['canonical_url'],
+          'https://www.tiktok.com/@user/video/9876543210',
+        );
+      },
+    );
+
+    test(
+      'createBookmark sans résolution (échec réseau simulé côté provider) '
+      'laisse canonicalUrl à null, sans régression sur le reste de la '
+      'sauvegarde',
+      () async {
+        final created = await repository.createBookmark(
+          url: 'https://vm.tiktok.com/ZS4BB5Rc7/',
+          title: 'Vidéo TikTok',
+          source: VideoSource.tiktok,
+        );
+
+        expect(created.canonicalUrl, isNull);
+        final entity = await localDatasource.findByRemoteId(created.id);
+        expect(entity!.canonicalUrl, isNull);
+      },
+    );
+
+    test(
+      'pullRemoteChanges mappe "canonical_url" depuis une ligne distante '
+      'vers VideoBookmark.canonicalUrl',
+      () async {
+        remoteDatasource.remoteRows['remote-canonical'] = {
+          'id': 'remote-canonical',
+          'user_id': 'user-1',
+          'url': 'https://vm.tiktok.com/ZS4BB5Rc7/',
+          'title': 'Vidéo TikTok distante',
+          'thumbnail_url': null,
+          'source': VideoSource.tiktok.name,
+          'tags': <String>[],
+          'note': null,
+          'is_partial': false,
+          'canonical_url': 'https://www.tiktok.com/@user/video/111',
+          'created_at': DateTime(2026).toIso8601String(),
+          'updated_at': DateTime(2026).toIso8601String(),
+        };
+
+        await repository.pullRemoteChanges();
+
+        final bookmarks = await repository.getAllBookmarks();
+        expect(bookmarks.single.canonicalUrl, 'https://www.tiktok.com/@user/video/111');
+      },
+    );
+
+    test(
+      'pullRemoteChanges tolère l\'absence de "canonical_url" sur une ligne '
+      'distante existante avant cette tâche',
+      () async {
+        remoteDatasource.remoteRows['remote-sans-canonical'] = {
+          'id': 'remote-sans-canonical',
+          'user_id': 'user-1',
+          'url': 'https://www.youtube.com/watch?v=abc',
+          'title': 'Vidéo YouTube',
+          'thumbnail_url': null,
+          'source': VideoSource.youtube.name,
+          'tags': <String>[],
+          'note': null,
+          'is_partial': false,
+          'created_at': DateTime(2026).toIso8601String(),
+          'updated_at': DateTime(2026).toIso8601String(),
+        };
+
+        await repository.pullRemoteChanges();
+
+        final bookmarks = await repository.getAllBookmarks();
+        expect(bookmarks.single.canonicalUrl, isNull);
+      },
+    );
+  });
 }

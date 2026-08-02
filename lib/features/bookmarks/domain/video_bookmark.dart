@@ -21,6 +21,7 @@ class VideoBookmark {
     this.isHidden = false,
     this.tags = const [],
     this.note,
+    this.canonicalUrl,
   });
 
   /// Identifiant unique, généré côté client (UUID) — sert aussi de clé
@@ -61,6 +62,14 @@ class VideoBookmark {
   /// Note libre optionnelle.
   final String? note;
 
+  /// URL longue résolue à partir de l'URL d'origine (voir DECISIONS.md,
+  /// entrée « Tâche 31 ») — écart documenté par rapport au modèle figé dans
+  /// SPEC.md section 3.1, `null` pour toute plateforme autre que TikTok pour
+  /// l'instant. Sert à `DeepLinkService` pour construire un lien natif
+  /// précis quand [url] est un lien court `vm.tiktok.com` sans identifiant
+  /// vidéo exploitable.
+  final String? canonicalUrl;
+
   /// Retourne une copie de ce bookmark, en remplaçant uniquement les champs
   /// fournis — utilisé notamment par `bookmark_context_menu.dart` pour
   /// modifier les tags sans altérer les autres champs avant de les
@@ -85,6 +94,7 @@ class VideoBookmark {
       isHidden: isHidden ?? this.isHidden,
       tags: tags ?? this.tags,
       note: note ?? this.note,
+      canonicalUrl: canonicalUrl,
     );
   }
 }
