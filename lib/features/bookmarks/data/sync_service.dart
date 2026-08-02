@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../tags/data/tag_repository.dart';
 import 'bookmark_repository.dart';
 
 /// Retourne vrai si une session Supabase active existe — injecté pour
@@ -10,8 +11,17 @@ import 'bookmark_repository.dart';
 /// réelle (voir CONVENTIONS.md section Tests).
 typedef HasActiveSessionCheck = bool Function();
 
-/// Synchronise en tâche de fond [BookmarkRepository] avec Supabase, sans
-/// jamais bloquer l'UI (voir SPEC.md section 3.3 et 13).
+/// Synchronise en tâche de fond [BookmarkRepository] **et** [TagRepository]
+/// avec Supabase, sans jamais bloquer l'UI (voir SPEC.md section 3.3 et 13).
+///
+/// **Extension aux tags (voir DECISIONS.md) :** [syncNow] traite les tags
+/// **avant** les bookmarks à chaque passage — choix documenté plutôt
+/// qu'imposé par une dépendance de correction stricte (aucune contrainte
+/// d'intégrité référentielle entre les deux collections : `BookmarkEntity.
+/// tags` reste une simple liste de chaînes, jamais une clé étrangère vers
+/// `TagEntity`) : les tags forment le jeu de données de référence le plus
+/// léger, les traiter en premier donne un ordre de lecture plus intuitif du
+/// code de cette méthode.
 ///
 /// Placé dans `features/bookmarks/data/` plutôt que `core/services/` (voir
 /// SPEC.md section 5) : sa logique manipule directement les flags
@@ -39,15 +49,18 @@ class SyncService {
   /// utilise `Connectivity().onConnectivityChanged`.
   SyncService({
     required BookmarkRepository repository,
+    required TagRepository tagRepository,
     required HasActiveSessionCheck hasActiveSession,
     Stream<List<ConnectivityResult>>? connectivityChanges,
     this.periodicInterval = const Duration(minutes: 2),
   }) : _repository = repository,
+       _tagRepository = tagRepository,
        _hasActiveSession = hasActiveSession,
        _connectivityChanges =
            connectivityChanges ?? Connectivity().onConnectivityChanged;
 
   final BookmarkRepository _repository;
+  final TagRepository _tagRepository;
   final HasActiveSessionCheck _hasActiveSession;
   final Stream<List<ConnectivityResult>> _connectivityChanges;
 
@@ -89,22 +102,28 @@ class SyncService {
     _periodicTimer = null;
   }
 
-  /// Effectue une passe complète de synchronisation : d'abord le push des
-  /// changements locaux en attente (suppressions en priorité, voir
-  /// [BookmarkRepository.syncPendingChanges]), puis le rapatriement des
-  /// changements distants ([BookmarkRepository.pullRemoteChanges]).
+  /// Effectue une passe complète de synchronisation, tags puis bookmarks
+  /// (voir doc de classe pour l'ordre) : pour chaque entité, d'abord le push
+  /// des changements locaux en attente (suppressions en priorité, voir
+  /// [TagRepository.syncPendingChanges]/[BookmarkRepository.
+  /// syncPendingChanges]), puis le rapatriement des changements distants
+  /// ([TagRepository.pullRemoteChanges]/[BookmarkRepository.
+  /// pullRemoteChanges]).
   ///
   /// Ne lève jamais d'exception — un échec réel est déjà journalisé au plus
-  /// près de sa source (voir `BookmarkRemoteSyncException`), et un échec de
-  /// rapatriement (ex: coupure réseau en cours de route) est journalisé ici,
-  /// jamais un `catch` silencieux (voir CONVENTIONS.md section Réponses
-  /// API), jamais non plus bloquant pour l'UI.
+  /// près de sa source (voir `TagRemoteSyncException`/
+  /// `BookmarkRemoteSyncException`), et un échec de rapatriement (ex:
+  /// coupure réseau en cours de route) est journalisé ici, jamais un `catch`
+  /// silencieux (voir CONVENTIONS.md section Réponses API), jamais non plus
+  /// bloquant pour l'UI.
   Future<void> syncNow() async {
     if (_isSyncing) return;
     if (!_hasActiveSession()) return;
 
     _isSyncing = true;
     try {
+      await _tagRepository.syncPendingChanges();
+      await _tagRepository.pullRemoteChanges();
       await _repository.syncPendingChanges();
       await _repository.pullRemoteChanges();
     } on Exception catch (error) {

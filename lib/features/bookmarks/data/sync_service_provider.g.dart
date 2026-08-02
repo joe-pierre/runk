@@ -9,8 +9,9 @@ part of 'sync_service_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Instance unique de [SyncService], construite à partir du
-/// [bookmarkRepositoryProvider] déjà exposé à la couche présentation et de
-/// l'état de session Supabase courant (`SupabaseService.client.auth`).
+/// [bookmarkRepositoryProvider] et du [tagRepositoryProvider] déjà exposés à
+/// la couche présentation, et de l'état de session Supabase courant
+/// (`SupabaseService.client.auth`).
 ///
 /// `keepAlive: true` : le service doit rester actif (abonnements réseau,
 /// minuteur périodique) pendant toute la durée de vie de l'app, démarré une
@@ -20,8 +21,9 @@ part of 'sync_service_provider.dart';
 final syncServiceProvider = SyncServiceProvider._();
 
 /// Instance unique de [SyncService], construite à partir du
-/// [bookmarkRepositoryProvider] déjà exposé à la couche présentation et de
-/// l'état de session Supabase courant (`SupabaseService.client.auth`).
+/// [bookmarkRepositoryProvider] et du [tagRepositoryProvider] déjà exposés à
+/// la couche présentation, et de l'état de session Supabase courant
+/// (`SupabaseService.client.auth`).
 ///
 /// `keepAlive: true` : le service doit rester actif (abonnements réseau,
 /// minuteur périodique) pendant toute la durée de vie de l'app, démarré une
@@ -36,8 +38,9 @@ final class SyncServiceProvider
         >
     with $FutureModifier<SyncService>, $FutureProvider<SyncService> {
   /// Instance unique de [SyncService], construite à partir du
-  /// [bookmarkRepositoryProvider] déjà exposé à la couche présentation et de
-  /// l'état de session Supabase courant (`SupabaseService.client.auth`).
+  /// [bookmarkRepositoryProvider] et du [tagRepositoryProvider] déjà exposés à
+  /// la couche présentation, et de l'état de session Supabase courant
+  /// (`SupabaseService.client.auth`).
   ///
   /// `keepAlive: true` : le service doit rester actif (abonnements réseau,
   /// minuteur périodique) pendant toute la durée de vie de l'app, démarré une
@@ -68,4 +71,4 @@ final class SyncServiceProvider
   }
 }
 
-String _$syncServiceHash() => r'07515a7415950db1e140ead06df62e1432804cdc';
+String _$syncServiceHash() => r'651806d8243deea8092c4d105b13b0f12ed03d71';

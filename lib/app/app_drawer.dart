@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/auth/data/auth_repository_provider.dart';
 import '../features/auth/presentation/auth_form.dart';
-import '../features/auth/presentation/link_local_bookmarks_prompt.dart';
+import '../features/auth/presentation/link_local_data_prompt.dart';
 import '../features/settings/presentation/theme_mode_selector.dart';
 
 /// Contenu du `Drawer` racine d'[AppShell] (Tâche 28, voir DECISIONS.md).
@@ -15,10 +15,11 @@ import '../features/settings/presentation/theme_mode_selector.dart';
 /// automatiquement via [authStateChangesProvider] (voir SPEC.md section 7).
 ///
 /// Écoute (`ref.listen`) les transitions "aucune session" → "session
-/// active" pour déclencher [promptToLinkLocalBookmarks], que la session
-/// vienne d'une connexion ou d'une inscription (voir DECISIONS.md, Tâche 28
-/// — le rattachement lui-même reste conditionné à l'existence d'au moins un
-/// bookmark local non lié, jamais affiché sans raison). Utilise le
+/// active" pour déclencher [promptToLinkLocalData], que la session vienne
+/// d'une connexion ou d'une inscription (voir DECISIONS.md, Tâche 28 et
+/// extension tags remote sync — le rattachement lui-même reste conditionné
+/// à l'existence d'au moins un bookmark **ou** tag local non lié, jamais
+/// affiché sans raison). Utilise le
 /// `BuildContext` de ce widget plutôt que celui d'`AuthForm` : ce dernier
 /// disparaît de l'arbre dès que la session change (remplacé par la vue
 /// connectée ci-dessous), et pourrait ne plus être monté au moment
@@ -37,9 +38,7 @@ class AppDrawer extends ConsumerWidget {
       final hadSession = previous?.value?.session != null;
       final nextSession = next.value?.session;
       if (!hadSession && nextSession != null) {
-        unawaited(
-          promptToLinkLocalBookmarks(context, ref, nextSession.user.id),
-        );
+        unawaited(promptToLinkLocalData(context, ref, nextSession.user.id));
       }
     });
 

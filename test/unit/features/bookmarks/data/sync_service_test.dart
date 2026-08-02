@@ -9,7 +9,10 @@ import 'package:runk/features/bookmarks/data/bookmark_local_datasource.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/sync_service.dart';
 import 'package:runk/features/tags/data/tag_local_datasource.dart';
+import 'package:runk/features/tags/data/tag_repository.dart';
 
+import '../../../features/tags/data/tag_repository_test.dart'
+    show FakeTagRemoteDatasource;
 import 'bookmark_repository_test.dart' show FakeBookmarkRemoteDatasource;
 
 void main() {
@@ -18,7 +21,9 @@ void main() {
   late BookmarkLocalDatasource localDatasource;
   late TagLocalDatasource tagLocalDatasource;
   late FakeBookmarkRemoteDatasource remoteDatasource;
+  late FakeTagRemoteDatasource tagRemoteDatasource;
   late BookmarkRepository repository;
+  late TagRepository tagRepository;
   SyncService? syncService;
 
   setUpAll(() async {
@@ -35,11 +40,19 @@ void main() {
     localDatasource = BookmarkLocalDatasource(isar);
     tagLocalDatasource = TagLocalDatasource(isar);
     remoteDatasource = FakeBookmarkRemoteDatasource();
+    tagRemoteDatasource = FakeTagRemoteDatasource();
     repository = BookmarkRepository(
       isar: isar,
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
       tagLocalDatasource: tagLocalDatasource,
+      getCurrentUserId: () => null,
+    );
+    tagRepository = TagRepository(
+      isar: isar,
+      tagLocalDatasource: tagLocalDatasource,
+      bookmarkLocalDatasource: localDatasource,
+      remoteDatasource: tagRemoteDatasource,
       getCurrentUserId: () => null,
     );
   });
@@ -73,6 +86,7 @@ void main() {
         await addPendingEntity('remote-1');
         syncService = SyncService(
           repository: repository,
+          tagRepository: tagRepository,
           hasActiveSession: () => false,
           connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
         );
@@ -101,6 +115,7 @@ void main() {
       };
       syncService = SyncService(
         repository: repository,
+        tagRepository: tagRepository,
         hasActiveSession: () => true,
         connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
       );
@@ -111,6 +126,47 @@ void main() {
       final bookmarks = await repository.getAllBookmarks();
       expect(bookmarks.map((b) => b.id), containsAll(['remote-1', 'remote-2']));
     });
+
+    test(
+      'traite les tags et les bookmarks en attente dans le même passage '
+      '(extension tags remote sync, voir DECISIONS.md)',
+      () async {
+        await addPendingEntity('remote-1');
+        await tagLocalDatasource.upsert(
+          TagEntity()
+            ..name = 'voyage'
+            ..remoteId = 'remote-tag-1'
+            ..userId = 'user-1'
+            ..createdAt = DateTime(2026)
+            ..updatedAt = DateTime(2026)
+            ..isSynced = false
+            ..isDeletedLocally = false,
+        );
+        tagRemoteDatasource.remoteRows['remote-tag-2'] = {
+          'id': 'remote-tag-2',
+          'user_id': 'user-1',
+          'name': 'depuis-second-appareil',
+          'is_hidden': false,
+          'created_at': DateTime(2026).toIso8601String(),
+          'updated_at': DateTime(2026).toIso8601String(),
+        };
+        syncService = SyncService(
+          repository: repository,
+          tagRepository: tagRepository,
+          hasActiveSession: () => true,
+          connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
+        );
+
+        await syncService!.syncNow();
+
+        expect(remoteDatasource.upsertedRows, hasLength(1));
+        expect(tagRemoteDatasource.upsertedRows, hasLength(1));
+        expect(
+          await tagRepository.getManagedTagNames(),
+          containsAll(['voyage', 'depuis-second-appareil']),
+        );
+      },
+    );
 
     test('ne relance pas une synchronisation déjà en cours', () async {
       await addPendingEntity('remote-1');
@@ -138,6 +194,7 @@ void main() {
       );
       syncService = SyncService(
         repository: slowRepository,
+        tagRepository: tagRepository,
         hasActiveSession: () => true,
         connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
       );
@@ -159,6 +216,7 @@ void main() {
       addTearDown(connectivityController.close);
       syncService = SyncService(
         repository: repository,
+        tagRepository: tagRepository,
         hasActiveSession: () => true,
         connectivityChanges: connectivityController.stream,
         periodicInterval: const Duration(minutes: 10),
@@ -178,6 +236,7 @@ void main() {
         await addPendingEntity('remote-1');
         syncService = SyncService(
           repository: repository,
+          tagRepository: tagRepository,
           hasActiveSession: () => true,
           connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
           periodicInterval: const Duration(milliseconds: 20),
@@ -200,6 +259,7 @@ void main() {
     test('dispose() arrête toute synchronisation ultérieure', () async {
       syncService = SyncService(
         repository: repository,
+        tagRepository: tagRepository,
         hasActiveSession: () => true,
         connectivityChanges: Stream<List<ConnectivityResult>>.empty(),
         periodicInterval: const Duration(milliseconds: 20),
