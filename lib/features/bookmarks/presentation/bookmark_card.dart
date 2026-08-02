@@ -1,8 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/models/video_source.dart';
+import '../../../core/theme/app_color_tokens.dart';
 import '../domain/video_bookmark.dart';
+
+/// Tokens de couleur actifs, ou [AppColorTokens.dark] si aucun thème Runk
+/// (`AppTheme.light`/`AppTheme.dark`, voir `core/theme/`) n'est enregistré —
+/// cas des tests de widget qui montent un `MaterialApp` minimal sans thème
+/// applicatif ; en usage réel, `main.dart` enregistre toujours l'extension.
+AppColorTokens _colorTokens(BuildContext context) =>
+    Theme.of(context).extension<AppColorTokens>() ?? AppColorTokens.dark;
 
 /// Carte d'affichage d'un [VideoBookmark] : miniature (ou placeholder si
 /// [VideoBookmark.isPartial]), titre, tags et icône de plateforme.
@@ -65,8 +74,15 @@ class BookmarkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final tokens = _colorTokens(context);
     return Card(
       clipBehavior: Clip.antiAlias,
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: tokens.cardBorder),
+      ),
       child: Stack(
         children: [
           InkWell(
@@ -87,7 +103,10 @@ class BookmarkCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(_platformIcon(bookmark.source), size: 16),
+                            _PlatformIcon(
+                              source: bookmark.source,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -107,7 +126,12 @@ class BookmarkCard extends StatelessWidget {
                             children: [
                               for (final tag in bookmark.tags)
                                 Chip(
-                                  label: Text(tag),
+                                  label: Text(
+                                    tag,
+                                    style: TextStyle(color: tokens.tagText),
+                                  ),
+                                  backgroundColor: tokens.tagBackground,
+                                  side: BorderSide.none,
                                   visualDensity: VisualDensity.compact,
                                   materialTapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
@@ -171,38 +195,94 @@ class _BookmarkThumbnail extends StatelessWidget {
     );
   }
 
+  /// Placeholder affiché si la miniature réseau est absente, non encore
+  /// chargée avec succès, ou si [VideoBookmark.isPartial] est vrai — fond
+  /// coloré assigné de façon déterministe (voir DECISIONS.md, Tâche 29) via
+  /// `AppColorTokens.thumbnailPalette`, jamais aléatoire à chaque rebuild ni
+  /// lié à [VideoSource]. Ne concerne jamais une vraie miniature réseau,
+  /// affichée par [CachedNetworkImage] ci-dessus.
   Widget _placeholder(BuildContext context, {required IconData icon}) {
+    final tokens = _colorTokens(context);
+    final palette = tokens.thumbnailPalette;
+    final color = palette[bookmark.id.hashCode.abs() % palette.length];
     return Container(
       width: _size,
       height: _size,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: color,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      child: Icon(icon, color: tokens.badgeText),
     );
   }
 }
 
-/// Icône représentative de [source].
+/// Icône représentative de [source], teintée par [color].
 ///
-/// Icônes Material génériques en attendant les icônes de plateforme
-/// dédiées prévues en Tâche 7 (voir SPEC.md section 8, `assets/icons/`).
-IconData _platformIcon(VideoSource source) {
-  switch (source) {
-    case VideoSource.youtube:
-      return Icons.smart_display_outlined;
-    case VideoSource.tiktok:
-      return Icons.music_note;
-    case VideoSource.instagram:
-      return Icons.camera_alt_outlined;
-    case VideoSource.facebook:
-      return Icons.facebook;
-    case VideoSource.twitter:
-      return Icons.alternate_email;
-    case VideoSource.threads:
-      return Icons.forum_outlined;
-    case VideoSource.unknown:
-      return Icons.link;
+/// Instagram/Facebook/X/Threads utilisent les icônes SVG dédiées
+/// d'`assets/icons/` (voir SPEC.md section 8), câblées en Tâche 29 — ce qui
+/// clôt la dette documentée dans `BUGS_AND_ROADMAP.md` (entrée Tâche 7).
+/// YouTube et TikTok n'ont pas d'icône SVG dédiée : icône Material générique
+/// conservée, teintée avec le même [color] pour rester visuellement
+/// cohérente avec les icônes SVG (voir DECISIONS.md, Tâche 29).
+class _PlatformIcon extends StatelessWidget {
+  const _PlatformIcon({required this.source, required this.color});
+
+  /// Plateforme dont l'icône doit être affichée.
+  final VideoSource source;
+
+  /// Teinte appliquée à l'icône (SVG ou Material).
+  final Color color;
+
+  static const _size = 16.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final svgAsset = _svgAssetFor(source);
+    if (svgAsset != null) {
+      return SvgPicture.asset(
+        svgAsset,
+        width: _size,
+        height: _size,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
+    }
+    return Icon(_materialIconFor(source), size: _size, color: color);
+  }
+
+  static String? _svgAssetFor(VideoSource source) {
+    switch (source) {
+      case VideoSource.instagram:
+        return 'assets/icons/instagram.svg';
+      case VideoSource.facebook:
+        return 'assets/icons/facebook.svg';
+      case VideoSource.twitter:
+        return 'assets/icons/x.svg';
+      case VideoSource.threads:
+        return 'assets/icons/threads.svg';
+      case VideoSource.youtube:
+      case VideoSource.tiktok:
+      case VideoSource.unknown:
+        return null;
+    }
+  }
+
+  static IconData _materialIconFor(VideoSource source) {
+    switch (source) {
+      case VideoSource.youtube:
+        return Icons.smart_display_outlined;
+      case VideoSource.tiktok:
+        return Icons.music_note;
+      case VideoSource.unknown:
+        return Icons.link;
+      case VideoSource.instagram:
+      case VideoSource.facebook:
+      case VideoSource.twitter:
+      case VideoSource.threads:
+        // Non atteint : ces 4 plateformes ont un SVG dédié, retourné plus
+        // haut par `_svgAssetFor`. Conservé uniquement pour l'exhaustivité
+        // du switch (voir `VideoSource`).
+        return Icons.link;
+    }
   }
 }

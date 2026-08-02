@@ -225,8 +225,48 @@ Aucune autre partie du code ne doit être modifiée pour ajouter une plateforme 
 
 - **Nom** : Runk
 - **Domaine** : runkapp.com
-- **Thème par défaut** : sombre (`ThemeData.dark(useMaterial3: true)`), cohérent avec un usage type "scroll de vidéos courtes"
-- Charte graphique détaillée (palette, typographie, icône) : à définir lors de la phase UI — non bloquant pour le développement fonctionnel.
+- **Thème par défaut** : suit le thème du système d'exploitation (`ThemeMode.system`) tant que l'utilisateur n'a jamais choisi explicitement un mode dans l'app — révision de l'ancien "sombre par défaut" en Tâche 29 (voir `DECISIONS.md`), pour respecter la contrainte "le mode système doit suivre le thème OS à la première ouverture". Bascule manuelle clair/sombre/système disponible dans la sidebar (`ThemeModeSelector`), persistée via `SharedPreferences`, sans redémarrage de l'app.
+- `useMaterial3: true` conservé. `ColorScheme` construit explicitement (`ColorScheme.light`/`.dark`, jamais `.fromSeed`) — voir `lib/core/theme/app_theme.dart`.
+
+### Palette (Tâche 29, figée avec l'utilisateur)
+
+**Mode sombre**
+
+| Rôle | Valeur |
+|---|---|
+| `background` (fond d'écran) | `#1B1512` |
+| `surface` (fond de carte) | `#241C17` |
+| `border` (bordure de carte) | `#362A20` |
+| `textPrimary` | `#FBF3E7` |
+| `textMuted` (icônes secondaires) | `#A08D74` |
+| `textMutedInactive` (icônes de nav inactives) | `#6B5D4D` |
+| `accent` | `#D85A30` |
+| `tagBackground` | `#3D2A18` |
+| `tagText` | `#FAC775` |
+| `badgeOverlay` (badge plateforme sur miniature) | `rgba(20,12,8,0.5)` |
+| `badgeText` | `#FDEEE7` |
+
+**Mode clair**
+
+| Rôle | Valeur |
+|---|---|
+| `background` | `#FAF2E4` |
+| `surface` | `#FFFFFF` |
+| `border` | `#E7D9C2` |
+| `textPrimary` | `#2B2015` |
+| `textMuted` | `#9C8B72` |
+| `textMutedInactive` | `#B3A488` |
+| `accent` | `#D85A30` (identique au sombre) |
+| `tagBackground` | `#F1E1C4` |
+| `tagText` | `#7A5518` |
+| `badgeOverlay` | `rgba(20,12,8,0.5)` (identique) |
+| `badgeText` | `#FDEEE7` (identique) |
+
+**Palette de miniatures placeholder** (3 couleurs cycliques, identiques dans les deux modes) : `#D85A30`, `#B84C6F`, `#3C7A63` — assignation déterministe par bookmark (`thumbnailPalette[bookmark.id.hashCode.abs() % thumbnailPalette.length]`), jamais aléatoire ni liée à la plateforme. S'applique uniquement au placeholder (`_BookmarkThumbnail`, cas `isPartial`/URL absente/erreur de chargement), jamais à une vraie miniature réseau.
+
+**Implémentation** : `lib/core/theme/app_palette.dart` (constantes brutes), `app_color_tokens.dart` (`AppColorTokens extends ThemeExtension`, rôles hors `ColorScheme` standard : `cardBorder`, `tagBackground`, `tagText`, `badgeOverlay`, `badgeText`, `thumbnailPalette`), `app_theme.dart` (`AppTheme.light`/`.dark`). Voir `DECISIONS.md`, entrées "Tâche 29", pour le détail des choix de mapping (`textMuted`→`onSurfaceVariant`, `textMutedInactive`→`outline`, etc.).
+
+Icônes de plateforme : SVG dédiés (`assets/icons/x.svg`, `instagram.svg`, `facebook.svg`, `threads.svg`) câblés dans `BookmarkCard` depuis la Tâche 29, teintés selon le thème actif. YouTube/TikTok n'ont pas d'icône SVG dédiée : icônes Material génériques conservées, teintées à l'identique.
 
 ## 11. Écrans
 
