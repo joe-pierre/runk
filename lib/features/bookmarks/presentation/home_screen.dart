@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_scaffold_key_provider.dart';
+import '../domain/video_bookmark.dart';
 import 'bookmark_card.dart';
 import 'bookmark_context_menu.dart';
 import 'bookmark_list_provider.dart';
+import 'bookmark_search_provider.dart';
 import 'bookmark_selection_controller.dart';
 import 'bookmark_tag_filter_provider.dart';
 import 'bulk_selection_toolbar.dart';
@@ -13,8 +15,8 @@ import 'manual_add_dialog.dart';
 import 'my_eyes_only_access.dart';
 import 'open_bookmark_action.dart';
 
-/// Sélection multiple de cet écran (Tâche 26, voir DECISIONS.md) — instance
-/// distincte de celle de `SearchScreen`, voir [BookmarkSelectionScope].
+/// Sélection multiple de cet écran (Tâche 26, voir DECISIONS.md) — seule
+/// instance existante depuis la Tâche 30, voir [BookmarkSelectionScope].
 const _selectionScope = BookmarkSelectionScope.home;
 
 /// Écran d'accueil : liste chronologique (date de création décroissante) de
@@ -22,29 +24,38 @@ const _selectionScope = BookmarkSelectionScope.home;
 /// 11) — un bookmark `isHidden: true` (voir Tâche 22, DECISIONS.md)
 /// disparaît immédiatement de cette liste, sans être supprimé.
 ///
-/// Purement présentationnel : lit [bookmarkListProvider] et affiche l'état
-/// correspondant (chargement, erreur, liste), ne décide jamais lui-même
-/// comment récupérer ou trier les bookmarks (voir CONVENTIONS.md section
-/// Partials / Frontend). Affiche `ClipboardSuggestionBanner` en haut de
-/// l'écran (voir SPEC.md section 11) — celle-ci ne prend aucune place tant
-/// qu'aucune suggestion n'est active. Un tap sur une carte délègue la
-/// réouverture à `DeepLinkService.openInSource` (voir SPEC.md section 4
-/// règle 5) — l'écran ne décide lui-même d'aucun schéma natif ni fallback,
-/// il se contente de transmettre le résultat à l'utilisateur.
+/// Purement présentationnel : lit [bookmarkListProvider]/[bookmarkSearchProvider]
+/// et affiche l'état correspondant (chargement, erreur, liste), ne décide
+/// jamais lui-même comment récupérer, trier ou rechercher les bookmarks (voir
+/// CONVENTIONS.md section Partials / Frontend). Affiche
+/// `ClipboardSuggestionBanner` en haut de l'écran (voir SPEC.md section 11) —
+/// celle-ci ne prend aucune place tant qu'aucune suggestion n'est active. Un
+/// tap sur une carte délègue la réouverture à `DeepLinkService.openInSource`
+/// (voir SPEC.md section 4 règle 5) — l'écran ne décide lui-même d'aucun
+/// schéma natif ni fallback, il se contente de transmettre le résultat à
+/// l'utilisateur.
 ///
-/// Si [bookmarkTagFilterProvider] est actif (venant de `TagsScreen`), filtre
-/// la liste sur ce tag et affiche un chip permettant de retirer le filtre —
-/// `BookmarkCard` reste le seul widget d'affichage d'un bookmark, aucune
-/// duplication (voir contrainte de la Tâche 9).
+/// **Barre de recherche intégrée (Tâche 30, voir DECISIONS.md) :** depuis la
+/// suppression de `SearchScreen`, la recherche full-text (titre + tags) se
+/// fait directement ici, via un champ placé dans le `bottom:` du
+/// `SliverAppBar` — masqué/réaffiché avec le titre "Runk" au scroll
+/// (`floating: true, snap: true`, natif, sans logique de détection de
+/// direction custom). Tant que le champ est vide, le comportement est
+/// strictement celui d'avant la Tâche 30 : [bookmarkListProvider], filtré par
+/// [bookmarkTagFilterProvider] si actif. Dès qu'une requête non vide est
+/// saisie, la liste bascule sur [bookmarkSearchProvider] (recherche purement
+/// locale, aucun appel réseau, voir contrainte de la Tâche 9) et le chip de
+/// filtre par tag est masqué — les deux filtres ne se combinent jamais,
+/// reprise à l'identique du comportement de l'ancien `SearchScreen` (voir
+/// DECISIONS.md, entrée « Tâche 30 »).
 ///
 /// Le bouton flottant "+" ouvre `ManualAddDialog`, troisième voie d'entrée
 /// d'un bookmark équivalente au Share Intent et à la suggestion clipboard
 /// (voir SPEC.md section 11).
 ///
 /// Un appui long sur une carte délègue à `showBookmarkContextMenu` (Tâche
-/// 21) l'ouverture du menu contextuel (modifier les tags / masquer /
-/// supprimer) — geste distinct du tap simple, sans interférence (voir
-/// `BookmarkCard`).
+/// 21) l'ouverture du menu contextuel (modifier les tags / supprimer) —
+/// geste distinct du tap simple, sans interférence (voir `BookmarkCard`).
 ///
 /// Un appui long sur le titre "Runk" de l'`AppBar` délègue à
 /// `openMyEyesOnly` (Tâche 22, voir DECISIONS.md) l'ouverture de la section
@@ -58,12 +69,55 @@ const _selectionScope = BookmarkSelectionScope.home;
 /// case à cocher et `BulkSelectionToolbar` apparaît en bas dès qu'au moins
 /// un bookmark est coché. Aucune action de masquage n'y est jamais exposée
 /// (voir `BulkSelectionToolbar`).
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bookmarksAsync = ref.watch(bookmarkListProvider);
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Filtre [allBookmarks] pour la liste normale (requête de recherche
+  /// vide) : masque les bookmarks masqués (`isHidden`), puis applique
+  /// [tagFilter] s'il est actif — comportement inchangé depuis avant la
+  /// Tâche 30.
+  List<VideoBookmark> _visibleBookmarks(
+    List<VideoBookmark> allBookmarks,
+    String? tagFilter,
+  ) {
+    final visible = allBookmarks
+        .where((bookmark) => !bookmark.isHidden)
+        .toList();
+    if (tagFilter == null) return visible;
+    return visible
+        .where((bookmark) => bookmark.tags.contains(tagFilter))
+        .toList();
+  }
+
+  /// Message affiché quand la liste à afficher est vide, selon le mode
+  /// actif — reprend à l'identique les messages respectifs de `HomeScreen`
+  /// et de l'ancien `SearchScreen` (voir DECISIONS.md, entrée « Tâche 30 »).
+  String _emptyMessage({
+    required bool isSearching,
+    required String query,
+    required String? tagFilter,
+  }) {
+    if (isSearching) return 'Aucun résultat pour "$query".';
+    return tagFilter == null
+        ? 'Partagez une vidéo vers Runk pour commencer.'
+        : 'Aucun bookmark avec ce tag.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tagFilter = ref.watch(bookmarkTagFilterProvider);
     final selection = ref.watch(
       bookmarkSelectionControllerProvider(_selectionScope),
@@ -72,105 +126,142 @@ class HomeScreen extends ConsumerWidget {
       bookmarkSelectionControllerProvider(_selectionScope).notifier,
     );
 
+    final trimmedQuery = _searchController.text.trim();
+    final isSearching = trimmedQuery.isNotEmpty;
+    final bookmarksAsync = isSearching
+        ? ref.watch(bookmarkSearchProvider(trimmedQuery))
+        : ref.watch(bookmarkListProvider);
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          tooltip: 'Menu',
-          onPressed: () =>
-              ref.read(appScaffoldKeyProvider).currentState?.openDrawer(),
-        ),
-        title: GestureDetector(
-          onLongPress: () => openMyEyesOnly(context, ref),
-          child: const Text('Runk'),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              selection.isSelectionModeActive ? Icons.close : Icons.checklist,
-            ),
-            tooltip: selection.isSelectionModeActive
-                ? 'Annuler la sélection'
-                : 'Sélectionner des bookmarks',
-            onPressed: selectionNotifier.toggleSelectionMode,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          const ClipboardSuggestionBanner(),
-          if (tagFilter != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Chip(
-                  label: Text('Filtré par : $tagFilter'),
-                  onDeleted: () =>
-                      ref.read(bookmarkTagFilterProvider.notifier).clear(),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(bookmarkListProvider.notifier).refresh(),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              snap: true,
+              leading: IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: 'Menu',
+                onPressed: () =>
+                    ref.read(appScaffoldKeyProvider).currentState?.openDrawer(),
+              ),
+              title: GestureDetector(
+                onLongPress: () => openMyEyesOnly(context, ref),
+                child: const Text('Runk'),
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    selection.isSelectionModeActive
+                        ? Icons.close
+                        : Icons.checklist,
+                  ),
+                  tooltip: selection.isSelectionModeActive
+                      ? 'Annuler la sélection'
+                      : 'Sélectionner des bookmarks',
+                  onPressed: selectionNotifier.toggleSelectionMode,
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(60),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Rechercher par titre ou tag',
+                      prefixIcon: Icon(Icons.search),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(24)),
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
               ),
             ),
-          Expanded(
-            child: bookmarksAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stackTrace) => Center(
-                child: Text(
-                  'Impossible de charger vos bookmarks.',
-                  style: Theme.of(context).textTheme.bodyMedium,
+            const SliverToBoxAdapter(child: ClipboardSuggestionBanner()),
+            if (!isSearching && tagFilter != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Chip(
+                      label: Text('Filtré par : $tagFilter'),
+                      onDeleted: () =>
+                          ref.read(bookmarkTagFilterProvider.notifier).clear(),
+                    ),
+                  ),
                 ),
               ),
-              data: (allBookmarks) {
-                final visibleBookmarks = allBookmarks
-                    .where((bookmark) => !bookmark.isHidden)
-                    .toList();
-                final bookmarks = tagFilter == null
-                    ? visibleBookmarks
-                    : visibleBookmarks
-                          .where(
-                            (bookmark) => bookmark.tags.contains(tagFilter),
-                          )
-                          .toList();
+            bookmarksAsync.when(
+              loading: () => const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (error, stackTrace) => SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    isSearching
+                        ? 'Impossible d\'effectuer la recherche.'
+                        : 'Impossible de charger vos bookmarks.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ),
+              data: (results) {
+                final bookmarks = isSearching
+                    ? results
+                    : _visibleBookmarks(results, tagFilter);
                 if (bookmarks.isEmpty) {
-                  return Center(
-                    child: Text(
-                      tagFilter == null
-                          ? 'Partagez une vidéo vers Runk pour commencer.'
-                          : 'Aucun bookmark avec ce tag.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                  return SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        _emptyMessage(
+                          isSearching: isSearching,
+                          query: trimmedQuery,
+                          tagFilter: tagFilter,
+                        ),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   );
                 }
-                return RefreshIndicator(
-                  onRefresh: () =>
-                      ref.read(bookmarkListProvider.notifier).refresh(),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: bookmarks.length,
-                    itemBuilder: (context, index) {
-                      final bookmark = bookmarks[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: BookmarkCard(
-                          bookmark: bookmark,
-                          onTap: () => openBookmark(context, ref, bookmark),
-                          onLongPress: () =>
-                              showBookmarkContextMenu(context, ref, bookmark),
-                          selectionMode: selection.isSelectionModeActive,
-                          isSelected: selection.selectedIds.contains(
-                            bookmark.id,
-                          ),
-                          onToggleSelection: (_) =>
-                              selectionNotifier.toggleSelected(bookmark.id),
+                return SliverList.builder(
+                  itemCount: bookmarks.length,
+                  itemBuilder: (context, index) {
+                    final bookmark = bookmarks[index];
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        12,
+                        index == 0 ? 12 : 0,
+                        12,
+                        8,
+                      ),
+                      child: BookmarkCard(
+                        bookmark: bookmark,
+                        onTap: () => openBookmark(context, ref, bookmark),
+                        onLongPress: () =>
+                            showBookmarkContextMenu(context, ref, bookmark),
+                        selectionMode: selection.isSelectionModeActive,
+                        isSelected: selection.selectedIds.contains(
+                          bookmark.id,
                         ),
-                      );
-                    },
-                  ),
+                        onToggleSelection: (_) =>
+                            selectionNotifier.toggleSelected(bookmark.id),
+                      ),
+                    );
+                  },
                 );
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => ManualAddDialog.show(context),

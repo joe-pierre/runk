@@ -10,8 +10,7 @@ part of 'bookmark_selection_controller.dart';
 // ignore_for_file: type=lint, type=warning
 /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
 /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-/// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-/// sélection partagé.
+/// sa doc).
 ///
 /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
 /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).
@@ -25,8 +24,7 @@ final bookmarkSelectionControllerProvider =
 
 /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
 /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-/// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-/// sélection partagé.
+/// sa doc).
 ///
 /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
 /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).
@@ -38,8 +36,7 @@ final class BookmarkSelectionControllerProvider
         $NotifierProvider<BookmarkSelectionController, BookmarkSelectionState> {
   /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
   /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-  /// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-  /// sélection partagé.
+  /// sa doc).
   ///
   /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
   /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).
@@ -96,8 +93,7 @@ String _$bookmarkSelectionControllerHash() =>
 
 /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
 /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-/// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-/// sélection partagé.
+/// sa doc).
 ///
 /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
 /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).
@@ -125,8 +121,7 @@ final class BookmarkSelectionControllerFamily extends $Family
 
   /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
   /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-  /// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-  /// sélection partagé.
+  /// sa doc).
   ///
   /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
   /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).
@@ -143,8 +138,7 @@ final class BookmarkSelectionControllerFamily extends $Family
 
 /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
 /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-/// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-/// sélection partagé.
+/// sa doc).
 ///
 /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
 /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).

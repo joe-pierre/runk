@@ -89,33 +89,5 @@ void main() {
       expect(state.isSelectionModeActive, isTrue);
       expect(state.selectedIds, isEmpty);
     });
-
-    test('les scopes home et search ont un état totalement indépendant', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      container
-          .read(
-            bookmarkSelectionControllerProvider(
-              BookmarkSelectionScope.home,
-            ).notifier,
-          )
-          .toggleSelected('1');
-
-      expect(
-        container
-            .read(bookmarkSelectionControllerProvider(BookmarkSelectionScope.home))
-            .selectedIds,
-        {'1'},
-      );
-      expect(
-        container
-            .read(
-              bookmarkSelectionControllerProvider(BookmarkSelectionScope.search),
-            )
-            .selectedIds,
-        isEmpty,
-      );
-    });
   });
 }

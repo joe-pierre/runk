@@ -14,8 +14,8 @@ enum _BookmarkMenuAction { editTags, delete }
 /// sur une `BookmarkCard`, voir Tâche 21) : "Modifier les tags" et
 /// "Supprimer".
 ///
-/// Ce menu partagé (`HomeScreen`, `SearchScreen`, `TagsScreen`,
-/// `MyEyesOnlyScreen`) ne doit **jamais**, dans aucun état de l'app, exposer
+/// Ce menu partagé (`HomeScreen`, `TagsScreen`, `MyEyesOnlyScreen`) ne doit
+/// **jamais**, dans aucun état de l'app, exposer
 /// quoi que ce soit lié au masquage "My Eyes Only" — même pas pour un
 /// bookmark déjà masqué (Tâche 24, ajustement explicite de la Tâche 22, voir
 /// DECISIONS.md). Démasquer un bookmark n'est possible que depuis l'action

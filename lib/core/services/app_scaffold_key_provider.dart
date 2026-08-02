@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Clé du `Scaffold` racine d'`AppShell`, partagée avec `HomeScreen`,
-/// `TagsScreen` et `SearchScreen` (Tâche 28, voir DECISIONS.md).
+/// Clé du `Scaffold` racine d'`AppShell`, partagée avec `HomeScreen` et
+/// `TagsScreen` (Tâche 28, voir DECISIONS.md — `SearchScreen` supprimé en
+/// Tâche 30).
 ///
-/// Chacun de ces 3 écrans a son propre `Scaffold` imbriqué sous celui
+/// Chacun de ces 2 écrans a son propre `Scaffold` imbriqué sous celui
 /// d'`AppShell` (constat déjà documenté en DECISIONS.md avant cette tâche) :
 /// `Scaffold.of(context)` depuis leur `AppBar` résoudrait donc à leur propre
 /// `Scaffold`, pas à celui d'`AppShell` qui porte le `Drawer`. Exposer cette
@@ -16,8 +17,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Placé dans `core/services/` plutôt que `app/` bien que conceptuellement
 /// "créé au niveau d'AppShell" (voir prompt de la Tâche 28) : ce provider ne
 /// dépend d'aucune feature, et le faire vivre dans `app/` aurait forcé
-/// `HomeScreen`/`TagsScreen`/`SearchScreen` (des `features/`) à importer
-/// depuis `app/`, inversant la direction de dépendance établie depuis
+/// `HomeScreen`/`TagsScreen` (des `features/`) à importer depuis `app/`,
+/// inversant la direction de dépendance établie depuis
 /// DECISIONS.md (Tâche 4) : `app/` dépend de `features/`, jamais l'inverse.
 /// `AppShell` reste l'unique endroit qui l'assigne à un `Scaffold` (voir
 /// `app_shell.dart`) — seul son emplacement de fichier diffère.

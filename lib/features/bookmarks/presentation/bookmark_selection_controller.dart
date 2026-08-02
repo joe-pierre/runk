@@ -3,10 +3,13 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'bookmark_selection_controller.g.dart';
 
 /// Écran propriétaire d'une instance de [BookmarkSelectionController]
-/// (Tâche 26, voir DECISIONS.md) — distingue `HomeScreen` et `SearchScreen`
-/// pour que chacun ait sa propre sélection : sortir de l'un ne doit jamais
-/// affecter la sélection de l'autre.
-enum BookmarkSelectionScope { home, search }
+/// (Tâche 26, voir DECISIONS.md). Depuis la Tâche 30 (recherche intégrée à
+/// `HomeScreen`, suppression de `SearchScreen`), `home` est la seule valeur
+/// restante — l'enum est conservée telle quelle (plutôt qu'un simple `bool`)
+/// pour ne pas re-designer `BookmarkSelectionController`/`BulkSelectionToolbar`
+/// (déjà paramétrés par ce scope) et permettre une extension future sans
+/// nouvelle refonte.
+enum BookmarkSelectionScope { home }
 
 /// État de la sélection multiple d'un écran donné : identifiants sélectionnés
 /// et activation du mode sélection.
@@ -39,8 +42,7 @@ class BookmarkSelectionState {
 
 /// Contrôleur de sélection multiple de bookmarks (Tâche 26, voir
 /// DECISIONS.md) : une instance distincte par [BookmarkSelectionScope] (voir
-/// sa doc) — `HomeScreen` et `SearchScreen` n'ont donc jamais d'état de
-/// sélection partagé.
+/// sa doc).
 ///
 /// Ne fait aucun appel à `BookmarkRepository` : ce contrôleur suit
 /// uniquement l'état d'interface (identifiants cochés, mode actif ou non).

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../features/bookmarks/presentation/home_screen.dart';
 import '../features/bookmarks/presentation/share_intent_gate.dart';
 import '../features/bookmarks/presentation/sync_service_gate.dart';
-import '../features/search/presentation/search_screen.dart';
 import '../features/tags/presentation/tags_screen.dart';
 import 'app_shell.dart';
 
@@ -13,8 +12,11 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
 );
 
 /// Configuration de navigation de Runk (voir SPEC.md section 11) : une
-/// unique route "shell" à 3 branches (Home / Tags / Recherche), chacune
-/// affichée dans son propre `IndexedStack` via [AppShell].
+/// unique route "shell" à 2 branches (Home / Tags), chacune affichée dans
+/// son propre `IndexedStack` via [AppShell]. La recherche (ancien 3ᵉ onglet
+/// `/search`) est absorbée depuis la Tâche 30 par une barre flottante
+/// directement sur `HomeScreen` (voir DECISIONS.md) — `SearchScreen`
+/// supprimé, plus aucune branche dédiée.
 ///
 /// `ShareIntentGate` et `SyncServiceGate` enveloppent la coquille entière,
 /// jamais un onglet en particulier : leur `context` reste ainsi un
@@ -44,14 +46,6 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/tags',
               builder: (context, state) => const TagsScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/search',
-              builder: (context, state) => const SearchScreen(),
             ),
           ],
         ),

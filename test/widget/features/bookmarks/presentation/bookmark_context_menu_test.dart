@@ -258,7 +258,16 @@ void main() {
         // carte derrière, toujours dans l'arbre bien qu'obscurcie).
         expect(find.text('humour'), findsWidgets);
 
-        await tester.enterText(find.byType(TextField), 'cuisine');
+        // find.byType(TextField) seul est désormais ambigu depuis la Tâche
+        // 30 : HomeScreen porte aussi le champ de recherche intégré — on
+        // cible celui du dialogue "Modifier les tags" (AlertDialog).
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextField),
+          ),
+          'cuisine',
+        );
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await pumpFrames(tester);
         await tester.tap(find.widgetWithText(FilledButton, 'Valider'));

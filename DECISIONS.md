@@ -976,3 +976,52 @@ Index unique insensible à la casse pour rester cohérent avec la déduplication
 **Fallback `AppColorTokens.dark` dans `BookmarkCard` :** plusieurs tests de widget existants (`home_screen_test.dart`, `search_screen_test.dart`, etc., tous antérieurs à cette tâche) montent un `MaterialApp` minimal sans `theme`/`darkTheme` applicatif, donc sans `AppColorTokens` enregistré — `Theme.of(context).extension<AppColorTokens>()` y renverrait `null`. Plutôt que de modifier les ~8 fichiers de test concernés (hors périmètre de cette tâche, qui ne porte que sur l'app réelle), `BookmarkCard`/`_BookmarkThumbnail` utilisent `Theme.of(context).extension<AppColorTokens>() ?? AppColorTokens.dark` — en usage réel, `main.dart` enregistre toujours l'extension via `AppTheme.light`/`.dark`, ce fallback ne s'active donc jamais en production.
 **Leçon :** quand un prompt de tâche propose explicitement plusieurs choix sans trancher ("l'un ou l'autre selon le contexte"), documenter la règle de résolution retenue plutôt que de choisir arbitrairement à chaque site d'appel — ici, la présence ou non d'une superposition sur une image colorée fait la distinction entre `badgeText` et `textMuted`.
 **Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 30 — Barre de recherche dans le `bottom:` du `SliverAppBar`, pas un second sliver
+
+**Contexte :** Tâche 30, le prompt laissait un choix technique explicite ("dans le `bottom:` du `SliverAppBar`, ou un second sliver directement en dessous — au choix technique, tant que les deux masquent/réapparaissent ensemble au scroll").
+**Alternatives envisagées :** (1) un second `SliverToBoxAdapter` (ou `SliverPersistentHeader`) juste après le `SliverAppBar`, contenant le champ de recherche ; (2) le champ de recherche dans `SliverAppBar.bottom` (`PreferredSize`).
+**Décision :** option 2. Un `bottom:` de `SliverAppBar` est explicitement conçu par Flutter pour ce cas (contenu qui doit se masquer/réapparaître strictement synchronisé avec le reste de l'`AppBar`, `floating`/`snap` inclus) — un second sliver séparé aurait exigé de dupliquer manuellement cette même logique de visibilité (aucune garantie native que deux slivers indépendants restent synchronisés au pixel près), sans bénéfice.
+**Leçon :** quand l'API native propose déjà un emplacement dédié pour exactement le besoin exprimé (ici `bottom:`, prévu pour du contenu secondaire solidaire de l'`AppBar`), le préférer à une reconstruction manuelle avec un second sliver, qui réintroduirait le risque de désynchronisation que `floating`/`snap` natifs évitent justement.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 30 — Bascule liste/résultats : `bookmarkSearchProvider` regardé conditionnellement, pas en parallèle
+
+**Contexte :** Tâche 30, `HomeScreen` doit reproduire à l'identique le comportement de l'ancien `SearchScreen` (chip de filtre par tag masqué pendant une recherche, les deux filtres ne se combinant jamais).
+**Décision :** `HomeScreen` regarde soit `bookmarkListProvider` (+ filtre par tag), soit `bookmarkSearchProvider(query)`, jamais les deux à la fois (`isSearching ? ref.watch(bookmarkSearchProvider(...)) : ref.watch(bookmarkListProvider)`) — `bookmarkListProvider` étant `autoDispose` (voir sa doc), il se dispose donc pendant qu'une recherche est active, et se reconstruit (nouvel accès Isar réel) quand la recherche est effacée. Comportement sans impact en usage réel (juste une relecture Isar supplémentaire, quasi instantanée), mais qui a nécessité d'adapter les tests (voir entrée ci-dessous) : un test widget sous `testWidgets` ne peut pas laisser cette reconstruction se résoudre hors de `tester.runAsync`.
+**Alternative écartée :** passer `bookmarkListProvider` en `keepAlive: true` pour éviter cette re-création — non retenu, changement de comportement du provider au-delà du périmètre de cette tâche (purement une recherche intégrée à l'écran, pas une revue du cycle de vie de `bookmarkListProvider`), à ne pas trancher silencieusement.
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [CHOIX] Tâche 30 — `BookmarkSelectionScope` réduit à `home` seul, énumération conservée
+
+**Contexte :** Tâche 30, suppression de `SearchScreen` et donc de sa propre instance de `BookmarkSelectionController` (Tâche 26). Le prompt demande explicitement de retirer `search` de `enum BookmarkSelectionScope` sans reconcevoir le contrôleur.
+**Décision :** l'enum ne garde que `home`, mais reste une énumération (pas un simple `bool`/singleton) — `BookmarkSelectionController`/`BulkSelectionToolbar` restent paramétrés par ce scope tels quels, sans re-design, pour ne pas re-toucher un mécanisme (family Riverpod) validé en Tâche 26 pour un changement qui ne porte que sur le nombre d'écrans appelants.
+**Leçon :** supprimer une valeur d'énumération devenue inutile ne justifie pas de reconcevoir la structure qui la consomme si elle reste par ailleurs valide avec une seule valeur — cohérent avec CONVENTIONS.md (ne pas modifier au-delà de ce que la tâche demande).
+**Statut :** 🔵 Choix assumé
+
+---
+
+## [RÉSOLU] Tâche 30 — Tests widgets avec Isar réel sur `HomeScreen` : `pumpWidget` doit être *à l'intérieur* du `runAsync`, pas seulement l'`await` final
+
+**Contexte :** Tâche 30, nouveaux tests de `home_screen_test.dart` couvrant la recherche intégrée (nécessitent un `BookmarkRepository` réel, pas `_FakeBookmarkList`, pour exercer `bookmarkSearchProvider` — voir DECISIONS.md, entrée Tâche 10). Un premier essai reproduisait le pattern de `search_screen_test.dart` (`tester.pumpWidget(...)` hors `runAsync`, puis `await tester.runAsync(() async { await container.read(bookmarkListProvider.future); })`) : blocage indéfini, reproductible à 100 %, dès le premier `pumpWidget`.
+**Symptôme / Problème :** `tester.pumpWidget` déclenche de façon synchrone `HomeScreen.build()` → `ref.watch(bookmarkListProvider)` → `BookmarkList.build()` → accès Isar réel (port natif, voir DECISIONS.md Tâche 10). Ce `pumpWidget` avait lieu **hors** de tout bloc `runAsync`, donc dans la zone Dart de `AutomatedTestWidgetsFlutterBinding` (horloge fake). Le `Future` retourné par une opération asynchrone reste lié à la zone dans laquelle elle a été *déclenchée*, pas à celle depuis laquelle on l'attend ensuite — entrer dans un `runAsync` **après coup** pour `await container.read(bookmarkListProvider.future)` ne fait donc jamais aboutir la continuation native, qui reste postée dans la zone fake jamais pompée.
+**Cause :** différence avec `search_screen_test.dart` (Tâche 10, toujours vert) : dans ce fichier, la requête vide initiale ne touche jamais Isar (`bookmarkSearchProvider('')` retourne `[]` synchronement sans toucher au repository, voir sa doc), donc le premier `pumpWidget`/`pumpAndSettle` hors `runAsync` ne déclenche jamais réellement d'accès Isar — seul l'`enterText` suivant (dans un bloc `runAsync` unique englobant aussi le `pump()` qui le déclenche) en déclenche un. `HomeScreen`, elle, accède toujours à Isar dès le premier `build()` (`bookmarkListProvider` regardé inconditionnellement dès que la recherche est vide) — la même règle que `bookmark_context_menu_test.dart` (Tâche 21) s'applique donc ici : `pumpWidget` doit être dans le **même** bloc `runAsync` que tout le reste.
+**Fix / Décision :** repris le pattern déjà établi par `bookmark_context_menu_test.dart` : un seul bloc `runAsync` par test, englobant `repository.createBookmark`, `tester.pumpWidget`, toutes les interactions (`enterText`, `tap`) et un helper local `pumpFrames` (boucle de vrais délais + `tester.pump(duration)`, `pumpAndSettle()` ne fonctionnant pas non plus à l'intérieur d'un `runAsync`, voir le commentaire déjà présent dans ce fichier) — plutôt que des allers-retours `container.read(provider.future)` ponctuels hors `runAsync`.
+**Leçon :** la règle de la Tâche 10 ("toute opération Isar réelle doit être sous `runAsync`") ne suffit pas seule : ce qui compte est la zone Dart dans laquelle l'opération est *déclenchée*, pas seulement celle dans laquelle on l'attend — dès qu'un écran accède à Isar inconditionnellement dès son premier `build()` (`HomeScreen`, contrairement à `SearchScreen` dont la requête vide court-circuitait Isar), le `pumpWidget` initial lui-même doit être dans le bloc `runAsync`, pas seulement les étapes suivantes.
+**Statut :** ✅ Résolu — `test/widget/features/bookmarks/presentation/home_screen_test.dart` (groupe "Recherche intégrée")
+
+---
+
+## [RÉSOLU] Tâche 30 — `find.byType(TextField)` devenu ambigu dans deux tests existants de `HomeScreen`
+
+**Contexte :** Tâche 30, l'ajout d'un champ de recherche sur `HomeScreen` (toujours visible, voir plus haut) casse deux tests préexistants qui supposaient un unique `TextField` à l'écran lors d'une saisie dans un dialogue ouvert par-dessus (`bookmark_context_menu_test.dart` : "Modifier les tags" ; `bulk_selection_toolbar_test.dart` : "Ajouter un tag (N)").
+**Symptôme / Problème :** `tester.enterText(find.byType(TextField), ...)` échoue avec `Bad state: Too many elements` / `Iterable.single` (deux `TextField` désormais présents : la barre de recherche de `HomeScreen` + le `TextField` interne de `TagInputField` dans le dialogue).
+**Fix / Décision :** scope la recherche au dialogue ouvert : `find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField))`, dans les deux fichiers concernés.
+**Leçon :** ajouter un `TextField` visible en permanence sur un écran existant peut casser silencieusement des finders `find.byType(TextField)` non scopés dans des tests déjà verts pour ce même écran — à vérifier systématiquement (`grep find.byType(TextField)` sur les fichiers montant l'écran modifié) avant de considérer une tâche d'UI terminée.
+**Statut :** ✅ Résolu — `test/widget/features/bookmarks/presentation/bookmark_context_menu_test.dart`, `test/widget/features/bookmarks/presentation/bulk_selection_toolbar_test.dart`
