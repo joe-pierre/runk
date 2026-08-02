@@ -15,8 +15,9 @@ enum _TagAction { rename, delete }
 
 /// Écran de navigation par tag (voir SPEC.md section 11), étendu depuis la
 /// Tâche 15 à la gestion indépendante des tags (voir DECISIONS.md, entrée
-/// « Tâche 15 ») : créer un tag sans bookmark associé (bouton "+" de
-/// l'`AppBar`), le renommer ou le supprimer (menu contextuel par tag).
+/// « Tâche 15 » et sa révision) : créer un tag sans bookmark associé
+/// (`FloatingActionButton` "+", cohérent avec `HomeScreen`), le renommer ou
+/// le supprimer (menu contextuel par tag).
 ///
 /// Liste tous les tags fusionnés ([distinctTagsProvider]) ; un tap sur un
 /// tag active [bookmarkTagFilterProvider] puis retourne sur l'onglet Home,
@@ -40,13 +41,11 @@ class TagsScreen extends ConsumerWidget {
               ref.read(appScaffoldKeyProvider).currentState?.openDrawer(),
         ),
         title: const Text('Tags'),
-        actions: [
-          IconButton(
-            tooltip: 'Ajouter un tag',
-            icon: const Icon(Icons.add),
-            onPressed: () => _createTag(context, ref),
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Ajouter un tag',
+        onPressed: () => _createTag(context, ref),
+        child: const Icon(Icons.add),
       ),
       body: tagsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
