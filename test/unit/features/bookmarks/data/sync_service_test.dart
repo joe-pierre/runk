@@ -36,6 +36,7 @@ void main() {
     tagLocalDatasource = TagLocalDatasource(isar);
     remoteDatasource = FakeBookmarkRemoteDatasource();
     repository = BookmarkRepository(
+      isar: isar,
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
       tagLocalDatasource: tagLocalDatasource,
@@ -128,6 +129,7 @@ void main() {
         gate: unblockFirstCall.future,
       );
       final slowRepository = BookmarkRepository(
+        isar: isar,
         localDatasource: localDatasource,
         remoteDatasource: slowRemote,
         tagLocalDatasource: tagLocalDatasource,
