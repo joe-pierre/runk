@@ -196,7 +196,13 @@ void main() {
 
     await tester.tap(find.byTooltip('Ajouter un tag'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'randonnée');
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      'randonnée',
+    );
     await tester.tap(find.text('Valider'));
     await tester.pumpAndSettle();
 
@@ -227,7 +233,13 @@ void main() {
     await tester.tap(find.text('Renommer'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'gastronomie');
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      'gastronomie',
+    );
     await tester.tap(find.text('Valider'));
     await tester.pumpAndSettle();
 
@@ -274,6 +286,70 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('cuisine'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'taper dans le champ de filtre masque les tags non correspondants',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+          tagRepositoryProvider.overrideWith(
+            (ref) async =>
+                _FakeTagRepository(const ['cuisine', 'voyage', 'sport']),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: TagsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('cuisine'), findsOneWidget);
+      expect(find.text('voyage'), findsOneWidget);
+      expect(find.text('sport'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'cui');
+      await tester.pumpAndSettle();
+
+      expect(find.text('cuisine'), findsOneWidget);
+      expect(find.text('voyage'), findsNothing);
+      expect(find.text('sport'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'un filtre ne correspondant à aucun tag affiche un message dédié',
+    (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(const ['cuisine']),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: TagsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'zzz');
+      await tester.pumpAndSettle();
+
+      expect(find.text('cuisine'), findsNothing);
+      expect(find.text('Aucun tag ne correspond à "zzz".'), findsOneWidget);
     },
   );
 }
