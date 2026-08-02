@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/data/auth_repository_provider.dart';
 import '../features/auth/presentation/auth_form.dart';
 import '../features/auth/presentation/link_local_bookmarks_prompt.dart';
+import '../features/settings/presentation/theme_mode_selector.dart';
 
 /// Contenu du `Drawer` racine d'[AppShell] (Tâche 28, voir DECISIONS.md).
 ///
@@ -22,6 +23,10 @@ import '../features/auth/presentation/link_local_bookmarks_prompt.dart';
 /// disparaît de l'arbre dès que la session change (remplacé par la vue
 /// connectée ci-dessous), et pourrait ne plus être monté au moment
 /// d'afficher la boîte de dialogue.
+///
+/// Porte aussi [ThemeModeSelector] (Tâche 29, voir DECISIONS.md), affiché
+/// dans tous les cas (session active ou non) au-dessus du contenu lié à
+/// l'authentification — le thème n'a aucun lien avec la connexion.
 class AppDrawer extends ConsumerWidget {
   /// Crée le drawer.
   const AppDrawer({super.key});
@@ -42,12 +47,22 @@ class AppDrawer extends ConsumerWidget {
 
     return Drawer(
       child: SafeArea(
-        child: session == null
-            ? const SingleChildScrollView(
-                padding: EdgeInsets.all(16),
-                child: AuthForm(),
-              )
-            : _SignedInDrawerContent(email: session.user.email ?? ''),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 16),
+            const ThemeModeSelector(),
+            const Divider(height: 32),
+            Expanded(
+              child: session == null
+                  ? const SingleChildScrollView(
+                      padding: EdgeInsets.all(16),
+                      child: AuthForm(),
+                    )
+                  : _SignedInDrawerContent(email: session.user.email ?? ''),
+            ),
+          ],
+        ),
       ),
     );
   }
