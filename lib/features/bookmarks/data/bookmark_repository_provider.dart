@@ -52,6 +52,7 @@ Future<Isar> bookmarkIsar(Ref ref) async {
 Future<BookmarkRepository> bookmarkRepository(Ref ref) async {
   final isar = await ref.watch(bookmarkIsarProvider.future);
   return BookmarkRepository(
+    isar: isar,
     localDatasource: BookmarkLocalDatasource(isar),
     remoteDatasource: BookmarkRemoteDatasource(SupabaseService.client),
     tagLocalDatasource: TagLocalDatasource(isar),

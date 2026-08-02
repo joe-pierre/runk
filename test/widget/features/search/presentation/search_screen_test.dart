@@ -35,6 +35,7 @@ void main() {
       inspector: false,
     );
     repository = BookmarkRepository(
+      isar: isar,
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
       tagLocalDatasource: TagLocalDatasource(isar),
