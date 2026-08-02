@@ -17,44 +17,49 @@ const BookmarkEntitySchema = CollectionSchema(
   name: r'BookmarkEntity',
   id: -7369956597930324689,
   properties: {
-    r'createdAt': PropertySchema(
+    r'canonicalUrl': PropertySchema(
       id: 0,
+      name: r'canonicalUrl',
+      type: IsarType.string,
+    ),
+    r'createdAt': PropertySchema(
+      id: 1,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'isDeletedLocally': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'isDeletedLocally',
       type: IsarType.bool,
     ),
-    r'isHidden': PropertySchema(id: 2, name: r'isHidden', type: IsarType.bool),
+    r'isHidden': PropertySchema(id: 3, name: r'isHidden', type: IsarType.bool),
     r'isPartial': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'isPartial',
       type: IsarType.bool,
     ),
-    r'isSynced': PropertySchema(id: 4, name: r'isSynced', type: IsarType.bool),
-    r'note': PropertySchema(id: 5, name: r'note', type: IsarType.string),
+    r'isSynced': PropertySchema(id: 5, name: r'isSynced', type: IsarType.bool),
+    r'note': PropertySchema(id: 6, name: r'note', type: IsarType.string),
     r'remoteId': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'remoteId',
       type: IsarType.string,
     ),
-    r'source': PropertySchema(id: 7, name: r'source', type: IsarType.string),
-    r'tags': PropertySchema(id: 8, name: r'tags', type: IsarType.stringList),
+    r'source': PropertySchema(id: 8, name: r'source', type: IsarType.string),
+    r'tags': PropertySchema(id: 9, name: r'tags', type: IsarType.stringList),
     r'thumbnailUrl': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'thumbnailUrl',
       type: IsarType.string,
     ),
-    r'title': PropertySchema(id: 10, name: r'title', type: IsarType.string),
+    r'title': PropertySchema(id: 11, name: r'title', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
-    r'url': PropertySchema(id: 12, name: r'url', type: IsarType.string),
-    r'userId': PropertySchema(id: 13, name: r'userId', type: IsarType.string),
+    r'url': PropertySchema(id: 13, name: r'url', type: IsarType.string),
+    r'userId': PropertySchema(id: 14, name: r'userId', type: IsarType.string),
   },
 
   estimateSize: _bookmarkEntityEstimateSize,
@@ -92,6 +97,12 @@ int _bookmarkEntityEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.canonicalUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   {
     final value = object.note;
     if (value != null) {
@@ -135,20 +146,21 @@ void _bookmarkEntitySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeBool(offsets[1], object.isDeletedLocally);
-  writer.writeBool(offsets[2], object.isHidden);
-  writer.writeBool(offsets[3], object.isPartial);
-  writer.writeBool(offsets[4], object.isSynced);
-  writer.writeString(offsets[5], object.note);
-  writer.writeString(offsets[6], object.remoteId);
-  writer.writeString(offsets[7], object.source);
-  writer.writeStringList(offsets[8], object.tags);
-  writer.writeString(offsets[9], object.thumbnailUrl);
-  writer.writeString(offsets[10], object.title);
-  writer.writeDateTime(offsets[11], object.updatedAt);
-  writer.writeString(offsets[12], object.url);
-  writer.writeString(offsets[13], object.userId);
+  writer.writeString(offsets[0], object.canonicalUrl);
+  writer.writeDateTime(offsets[1], object.createdAt);
+  writer.writeBool(offsets[2], object.isDeletedLocally);
+  writer.writeBool(offsets[3], object.isHidden);
+  writer.writeBool(offsets[4], object.isPartial);
+  writer.writeBool(offsets[5], object.isSynced);
+  writer.writeString(offsets[6], object.note);
+  writer.writeString(offsets[7], object.remoteId);
+  writer.writeString(offsets[8], object.source);
+  writer.writeStringList(offsets[9], object.tags);
+  writer.writeString(offsets[10], object.thumbnailUrl);
+  writer.writeString(offsets[11], object.title);
+  writer.writeDateTime(offsets[12], object.updatedAt);
+  writer.writeString(offsets[13], object.url);
+  writer.writeString(offsets[14], object.userId);
 }
 
 BookmarkEntity _bookmarkEntityDeserialize(
@@ -158,21 +170,22 @@ BookmarkEntity _bookmarkEntityDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = BookmarkEntity();
-  object.createdAt = reader.readDateTime(offsets[0]);
-  object.isDeletedLocally = reader.readBool(offsets[1]);
-  object.isHidden = reader.readBool(offsets[2]);
-  object.isPartial = reader.readBool(offsets[3]);
-  object.isSynced = reader.readBool(offsets[4]);
+  object.canonicalUrl = reader.readStringOrNull(offsets[0]);
+  object.createdAt = reader.readDateTime(offsets[1]);
+  object.isDeletedLocally = reader.readBool(offsets[2]);
+  object.isHidden = reader.readBool(offsets[3]);
+  object.isPartial = reader.readBool(offsets[4]);
+  object.isSynced = reader.readBool(offsets[5]);
   object.isarId = id;
-  object.note = reader.readStringOrNull(offsets[5]);
-  object.remoteId = reader.readString(offsets[6]);
-  object.source = reader.readString(offsets[7]);
-  object.tags = reader.readStringList(offsets[8]) ?? [];
-  object.thumbnailUrl = reader.readStringOrNull(offsets[9]);
-  object.title = reader.readStringOrNull(offsets[10]);
-  object.updatedAt = reader.readDateTime(offsets[11]);
-  object.url = reader.readString(offsets[12]);
-  object.userId = reader.readStringOrNull(offsets[13]);
+  object.note = reader.readStringOrNull(offsets[6]);
+  object.remoteId = reader.readString(offsets[7]);
+  object.source = reader.readString(offsets[8]);
+  object.tags = reader.readStringList(offsets[9]) ?? [];
+  object.thumbnailUrl = reader.readStringOrNull(offsets[10]);
+  object.title = reader.readStringOrNull(offsets[11]);
+  object.updatedAt = reader.readDateTime(offsets[12]);
+  object.url = reader.readString(offsets[13]);
+  object.userId = reader.readStringOrNull(offsets[14]);
   return object;
 }
 
@@ -184,9 +197,9 @@ P _bookmarkEntityDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 2:
       return (reader.readBool(offset)) as P;
     case 3:
@@ -194,22 +207,24 @@ P _bookmarkEntityDeserializeProp<P>(
     case 4:
       return (reader.readBool(offset)) as P;
     case 5:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readString(offset)) as P;
     case 9:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readStringList(offset) ?? []) as P;
     case 10:
       return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 12:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 13:
+      return (reader.readString(offset)) as P;
+    case 14:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -424,6 +439,165 @@ extension BookmarkEntityQueryWhere
 
 extension BookmarkEntityQueryFilter
     on QueryBuilder<BookmarkEntity, BookmarkEntity, QFilterCondition> {
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'canonicalUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'canonicalUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'canonicalUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'canonicalUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'canonicalUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'canonicalUrl',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'canonicalUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'canonicalUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'canonicalUrl',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'canonicalUrl',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'canonicalUrl', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
+  canonicalUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'canonicalUrl', value: ''),
+      );
+    });
+  }
+
   QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterFilterCondition>
   createdAtEqualTo(DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -1883,6 +2057,20 @@ extension BookmarkEntityQueryLinks
 
 extension BookmarkEntityQuerySortBy
     on QueryBuilder<BookmarkEntity, BookmarkEntity, QSortBy> {
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy>
+  sortByCanonicalUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'canonicalUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy>
+  sortByCanonicalUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'canonicalUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -2054,6 +2242,20 @@ extension BookmarkEntityQuerySortBy
 
 extension BookmarkEntityQuerySortThenBy
     on QueryBuilder<BookmarkEntity, BookmarkEntity, QSortThenBy> {
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy>
+  thenByCanonicalUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'canonicalUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy>
+  thenByCanonicalUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'canonicalUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<BookmarkEntity, BookmarkEntity, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -2239,6 +2441,13 @@ extension BookmarkEntityQuerySortThenBy
 extension BookmarkEntityQueryWhereDistinct
     on QueryBuilder<BookmarkEntity, BookmarkEntity, QDistinct> {
   QueryBuilder<BookmarkEntity, BookmarkEntity, QDistinct>
+  distinctByCanonicalUrl({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'canonicalUrl', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, BookmarkEntity, QDistinct>
   distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
@@ -2345,6 +2554,13 @@ extension BookmarkEntityQueryProperty
   QueryBuilder<BookmarkEntity, int, QQueryOperations> isarIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isarId');
+    });
+  }
+
+  QueryBuilder<BookmarkEntity, String?, QQueryOperations>
+  canonicalUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'canonicalUrl');
     });
   }
 

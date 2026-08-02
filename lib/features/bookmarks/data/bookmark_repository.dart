@@ -97,6 +97,7 @@ class BookmarkRepository {
     bool isPartial = false,
     List<String> tags = const [],
     String? note,
+    String? canonicalUrl,
   }) async {
     final now = DateTime.now();
     final hasHiddenTag = await _tagLocalDatasource.hasAnyHiddenTag(tags);
@@ -111,6 +112,7 @@ class BookmarkRepository {
       ..isHidden = hasHiddenTag
       ..tags = tags
       ..note = note
+      ..canonicalUrl = canonicalUrl
       ..createdAt = now
       ..updatedAt = now
       ..isSynced = false
@@ -159,6 +161,7 @@ class BookmarkRepository {
       ..isHidden = hasHiddenTag || bookmark.isHidden
       ..tags = bookmark.tags
       ..note = bookmark.note
+      ..canonicalUrl = bookmark.canonicalUrl
       ..updatedAt = DateTime.now()
       ..isSynced = false;
 
@@ -473,6 +476,7 @@ class BookmarkRepository {
     'note': entity.note,
     'is_partial': entity.isPartial,
     'is_hidden': entity.isHidden,
+    'canonical_url': entity.canonicalUrl,
     'created_at': entity.createdAt.toIso8601String(),
     'updated_at': entity.updatedAt.toIso8601String(),
   };
@@ -491,6 +495,7 @@ class BookmarkRepository {
     ..isHidden = row['is_hidden'] as bool? ?? false
     ..tags = List<String>.from(row['tags'] as List? ?? const [])
     ..note = row['note'] as String?
+    ..canonicalUrl = row['canonical_url'] as String?
     ..createdAt = DateTime.parse(row['created_at'] as String)
     ..updatedAt = DateTime.parse(row['updated_at'] as String)
     ..isSynced = true
@@ -508,5 +513,6 @@ class BookmarkRepository {
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
     note: entity.note,
+    canonicalUrl: entity.canonicalUrl,
   );
 }

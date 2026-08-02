@@ -35,6 +35,14 @@ class BookmarkEntity {
   bool isHidden = false;
   List<String> tags = [];
   String? note;
+
+  /// URL longue résolue à partir de l'URL d'origine (Tâche 31, voir
+  /// DECISIONS.md) — nullable, seul `TiktokProvider` la renseigne pour
+  /// l'instant. Champ nullable ajouté à une collection existante : aucune
+  /// migration Isar manuelle requise, les lignes déjà stockées se lisent
+  /// avec `canonicalUrl == null`.
+  String? canonicalUrl;
+
   late DateTime createdAt;
   late DateTime updatedAt;
 

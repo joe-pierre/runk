@@ -70,6 +70,7 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
         thumbnailUrl: metadata.thumbnailUrl,
         isPartial: metadata.isPartial,
         tags: _tags,
+        canonicalUrl: metadata.canonicalUrl,
       );
       await ref.read(bookmarkListProvider.notifier).refresh();
       if (mounted) Navigator.of(context).pop();
