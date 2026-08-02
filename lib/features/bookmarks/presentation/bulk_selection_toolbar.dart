@@ -10,10 +10,12 @@ import 'tag_input_field.dart';
 /// bookmark est sélectionné (mode sélection multiple, Tâche 26, voir
 /// DECISIONS.md) : "Supprimer (N)" et "Ajouter un tag (N)".
 ///
-/// Réutilisable entre `HomeScreen` et `SearchScreen`, chacun avec sa propre
-/// instance de `BookmarkSelectionController` désignée par [scope] (voir sa
-/// doc de classe — pas de sélection partagée entre les deux écrans). Porte
-/// toute la logique de mutation groupée
+/// Paramétrée par [scope] (voir la doc de classe de `BookmarkSelectionController`
+/// / `BookmarkSelectionScope`) — `home` est la seule instance appelante
+/// depuis la Tâche 30 (suppression de `SearchScreen`, voir DECISIONS.md), le
+/// paramètre est conservé pour ne pas re-designer ce widget si un second
+/// écran de sélection multiple apparaît plus tard. Porte toute la logique de
+/// mutation groupée
 /// (`BookmarkRepository.deleteBookmarks`/`addTagsToBookmarks` puis
 /// rafraîchissement de [bookmarkListProvider]) — les écrans appelants
 /// restent purement présentationnels (voir CONVENTIONS.md section Partials /

@@ -272,13 +272,14 @@ Icônes de plateforme : SVG dédiés (`assets/icons/x.svg`, `instagram.svg`, `fa
 
 | Écran | Rôle |
 |---|---|
-| **Home** | Liste chronologique de tous les bookmarks, tri par date |
+| **Home** | Liste chronologique de tous les bookmarks, tri par date. Depuis la Tâche 30 (voir `DECISIONS.md`), porte aussi la recherche full-text (titre + tags) via une barre flottante en haut de l'écran — absorbe le rôle de l'ancien écran Search, supprimé |
 | **Clipboard Suggestion Banner** | Bannière discrète et non bloquante affichée en haut de `HomeScreen` au retour au premier plan si un lien vidéo valide et nouveau est détecté dans le presse-papier ; deux actions : "Ajouter" (ouvre `AddBookmarkSheet`) ou "Ignorer" (le lien n'est plus reproposé) |
 | **Add Bookmark Sheet** | Modale déclenchée par le Share Intent, la Clipboard Suggestion Banner, ou un bouton "+", pré-remplie avec metadata, permet titre custom + tags |
 | **Tags** | Navigation par catégorie/tag |
-| **Search** | Recherche full-text sur titre + tags |
 
-Navigation : `Bottom Navigation Bar` à 3 onglets (Home / Tags / Recherche), la modale d'ajout se superpose par-dessus n'importe quel écran.
+Navigation : `Bottom Navigation Bar` à 2 onglets (Home / Tags, réduite de 3 à 2 en Tâche 30 — voir `DECISIONS.md`), la modale d'ajout se superpose par-dessus n'importe quel écran.
+
+**Recherche intégrée à `HomeScreen` (Tâche 30, écart assumé par rapport à la version initiale de cette section) :** barre de recherche placée dans le `bottom:` d'un `SliverAppBar(floating: true, snap: true)`, qui se masque/réapparaît avec le titre "Runk" au scroll (comportement natif Flutter, sans logique de détection de direction custom). Requête vide → liste normale (`bookmarkListProvider`, filtrée par `bookmarkTagFilterProvider` si actif) ; requête non vide → bascule sur `bookmarkSearchProvider` (recherche purement locale, aucun appel réseau), le chip de filtre par tag est alors masqué — les deux filtres ne se combinent jamais. `SearchScreen` et l'onglet Recherche sont supprimés, leur fonction est entièrement absorbée par cette barre.
 
 ## 12. Tâches
 

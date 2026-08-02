@@ -9,9 +9,9 @@ import '../domain/video_bookmark.dart';
 /// si ni le schéma natif ni le navigateur n'ont pu ouvrir la vidéo (cas
 /// extrême) — ne plante jamais l'écran appelant.
 ///
-/// Partagé entre `HomeScreen` et `SearchScreen` (toutes deux affichent des
-/// `BookmarkCard` tapables) pour ne jamais dupliquer cette logique
-/// d'ouverture (voir CONVENTIONS.md, éviter la duplication entre écrans).
+/// Utilisé par `HomeScreen` (qui affiche des `BookmarkCard` tapables) pour
+/// ne jamais dupliquer cette logique d'ouverture (voir CONVENTIONS.md, éviter
+/// la duplication entre écrans).
 Future<void> openBookmark(
   BuildContext context,
   WidgetRef ref,

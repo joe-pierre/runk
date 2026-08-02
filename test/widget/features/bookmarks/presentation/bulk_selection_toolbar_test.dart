@@ -271,7 +271,16 @@ void main() {
 
         expect(find.text('Ajouter un tag à 2 bookmarks'), findsOneWidget);
 
-        await tester.enterText(find.byType(TextField), 'nouveau');
+        // find.byType(TextField) seul est désormais ambigu depuis la Tâche
+        // 30 : HomeScreen porte aussi le champ de recherche intégré — on
+        // cible celui du dialogue "Ajouter un tag" (AlertDialog).
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextField),
+          ),
+          'nouveau',
+        );
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await pumpFrames(tester);
         await tester.tap(find.widgetWithText(FilledButton, 'Valider'));

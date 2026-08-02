@@ -102,6 +102,11 @@
 - [x] Tâche 29 — Icônes SVG de plateforme (`assets/icons/x.svg`, `instagram.svg`, `facebook.svg`, `threads.svg`) câblées dans `BookmarkCard._PlatformIcon` (teintées via les tokens), clôturant la dette documentée en Tâche 7 (voir `BUGS_AND_ROADMAP.md`) — nouvelle dépendance directe `flutter_svg`
 - [ ] Validation visuelle manuelle sur appareil physique (couleurs réelles, icônes de plateforme, bascule clair/sombre) — aucun appareil Android/iOS ni émulateur disponible dans cette session, même limitation que la quasi-totalité des tâches précédentes
 
+## Phase 6.6 — Recherche intégrée à HomeScreen
+
+- [x] Tâche 30 — Recherche intégrée à `HomeScreen` (barre flottante) + suppression de l'onglet Recherche : `HomeScreen` passe de `Scaffold.appBar` à `CustomScrollView`/`SliverAppBar(floating: true, snap: true)` (titre "Runk" + champ de recherche dans son `bottom:`, masqués/réaffichés ensemble au scroll, comportement natif) ; `ListView.builder` devenu `SliverList.builder` ; `RefreshIndicator` conservé autour du `CustomScrollView`. Requête vide → comportement inchangé (`bookmarkListProvider` + `bookmarkTagFilterProvider`) ; requête non vide → bascule sur `bookmarkSearchProvider`, chip de filtre par tag masqué (reprise à l'identique du comportement de l'ancien `SearchScreen`, voir `DECISIONS.md`). `lib/features/search/` et l'onglet `/search` supprimés (`router.dart`, `app_shell.dart` : 2 `NavigationDestination`), `BookmarkSelectionScope.search` retiré de l'enum (ne garde que `home`). `search_screen_test.dart` supprimé, ses cas repris dans un nouveau groupe de `home_screen_test.dart` (3 cas avec Isar réel, voir `DECISIONS.md`). `SPEC.md` section 11 mise à jour (2 écrans, 2 onglets)
+- [ ] Validation visuelle manuelle sur appareil physique (masquage/réapparition de la barre au scroll, clavier virtuel avec le champ de recherche dans le `SliverAppBar`) — aucun appareil Android/iOS ni émulateur disponible dans cette session, même limitation que la quasi-totalité des tâches précédentes
+
 ## Phase 7 — Préparation au déploiement
 
 - [ ] Politique de confidentialité rédigée et publiée sur `runkapp.com/privacy`

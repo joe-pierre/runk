@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../core/services/app_scaffold_key_provider.dart';
 import 'app_drawer.dart';
 
-/// Coquille de navigation principale de Runk : bottom navigation à 3 onglets
-/// (Home / Tags / Recherche), voir SPEC.md section 11.
+/// Coquille de navigation principale de Runk : bottom navigation à 2 onglets
+/// (Home / Tags), voir SPEC.md section 11 — réduite de 3 à 2 onglets en
+/// Tâche 30 (recherche absorbée par une barre flottante sur `HomeScreen`,
+/// suppression de l'onglet Recherche, voir DECISIONS.md).
 ///
 /// Purement présentationnel : reçoit [navigationShell], déjà construit par
 /// `StatefulShellRoute.indexedStack` (voir `router.dart`), et se contente
@@ -17,15 +19,14 @@ import 'app_drawer.dart';
 /// true)` déjà configuré dans `main.dart`).
 ///
 /// Porte le `Drawer` d'authentification (`AppDrawer`, Tâche 28, voir
-/// DECISIONS.md), ouvert depuis les 3 écrans via [appScaffoldKeyProvider]
+/// DECISIONS.md), ouvert depuis les 2 écrans via [appScaffoldKeyProvider]
 /// (voir sa doc) plutôt que `Scaffold.of(context)`, chaque écran ayant son
 /// propre `Scaffold` imbriqué.
 class AppShell extends ConsumerWidget {
   /// Crée la coquille pour [navigationShell].
   const AppShell({super.key, required this.navigationShell});
 
-  /// État de navigation des 3 branches (Home / Tags / Recherche), fourni par
-  /// go_router.
+  /// État de navigation des 2 branches (Home / Tags), fourni par go_router.
   final StatefulNavigationShell navigationShell;
 
   @override
@@ -50,11 +51,6 @@ class AppShell extends ConsumerWidget {
             icon: Icon(Icons.label_outline),
             selectedIcon: Icon(Icons.label),
             label: 'Tags',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: 'Recherche',
           ),
         ],
       ),
