@@ -11,10 +11,14 @@ import '../models/video_source.dart';
 /// `vnd.youtube://`) ne sont documentés par aucune des plateformes cibles :
 /// ce sont des conventions observées, susceptibles de changer ou de cesser
 /// de fonctionner sans préavis à la discrétion de l'éditeur de chaque app.
-/// Threads n'a, à la connaissance de ce projet, aucun schéma connu — le
-/// repli navigateur y est donc systématique. Voir `BUGS_AND_ROADMAP.md`
-/// ("Les schémas de deep link natifs... peuvent changer sans préavis") pour
-/// le suivi de cette fragilité dans le temps.
+/// Pour TikTok et X/Twitter, ces conventions attendent en plus un
+/// identifiant numérique précis extrait du chemin de l'URL (voir
+/// `_nativeUriFor`) plutôt qu'une simple reconstruction hôte/chemin — si cet
+/// identifiant est introuvable, aucun schéma natif n'est tenté. Threads n'a,
+/// à la connaissance de ce projet, aucun schéma connu — le repli navigateur
+/// y est donc systématique. Voir `BUGS_AND_ROADMAP.md` ("Les schémas de deep
+/// link natifs... peuvent changer sans préavis") pour le suivi de cette
+/// fragilité dans le temps.
 ///
 /// Le repli navigateur (`url_launcher`, `LaunchMode.externalApplication`)
 /// n'est jamais optionnel : il s'exécute systématiquement si le schéma
@@ -70,10 +74,17 @@ class DeepLinkService {
     }
   }
 
+  /// Id numérique en fin de chemin après `/status/` (X/Twitter).
+  static final RegExp _twitterStatusIdPattern = RegExp(r'/status/(\d+)');
+
+  /// Id numérique en fin de chemin après `/video/` (TikTok).
+  static final RegExp _tiktokVideoIdPattern = RegExp(r'/video/(\d+)');
+
   /// Construit l'URI du schéma natif de [source] pour [url], ou `null` si
   /// aucun schéma n'est connu pour cette plateforme (Threads, ou source
-  /// [VideoSource.unknown]) — dans ce cas, [openInSource] passe directement
-  /// au repli navigateur.
+  /// [VideoSource.unknown]), ou si l'identifiant précis attendu par le
+  /// schéma (TikTok, X/Twitter) est introuvable dans [url] — dans ce cas,
+  /// [openInSource] passe directement au repli navigateur.
   Uri? _nativeUriFor(String url, VideoSource source) {
     final original = Uri.tryParse(url);
     if (original == null) return null;
@@ -90,9 +101,17 @@ class DeepLinkService {
       case VideoSource.instagram:
         return Uri.tryParse(rebuild('instagram'));
       case VideoSource.tiktok:
-        return Uri.tryParse(rebuild('snssdk1233'));
+        // Schéma tiers attendant l'id numérique de la vidéo, pas une simple
+        // reconstruction hôte/chemin (voir doc de classe).
+        final id = _tiktokVideoIdPattern.firstMatch(original.path)?.group(1);
+        if (id == null) return null;
+        return Uri.tryParse('snssdk1233://aweme/detail/$id?refer=web');
       case VideoSource.twitter:
-        return Uri.tryParse(rebuild('twitter'));
+        // Schéma tiers attendant l'id numérique du statut, pas une simple
+        // reconstruction hôte/chemin (voir doc de classe).
+        final id = _twitterStatusIdPattern.firstMatch(original.path)?.group(1);
+        if (id == null) return null;
+        return Uri.tryParse('twitter://status?id=$id');
       case VideoSource.facebook:
         // Schéma spécifique documenté par des tiers pour ouvrir une URL
         // Facebook arbitraire (pas de simple reconstruction hôte/chemin).
