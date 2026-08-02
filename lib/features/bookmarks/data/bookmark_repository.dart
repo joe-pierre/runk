@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:isar_community/isar.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/models/video_source.dart';
@@ -29,18 +30,31 @@ import 'bookmark_remote_sync_exception.dart';
 /// faite sur `TagEntity` (responsabilité exclusive de `TagRepository`,
 /// jamais partagée) — une simple lecture, pas de composition de transaction
 /// nécessaire.
+///
+/// **Accès direct à [Isar] (Tâche 26, voir DECISIONS.md) :** [deleteBookmarks]
+/// et [addTagsToBookmarks] doivent appliquer leur lot de mutations locales
+/// dans une **unique** transaction Isar (contrainte explicite de la tâche,
+/// pour éviter un état incohérent en cas de crash en cours de lot) — même
+/// raisonnement et même mécanisme que `TagRepository` (voir sa doc de
+/// classe) : `BookmarkLocalDatasource.upsert` ouvre sa propre transaction par
+/// appel, incompatible avec cette composition, donc ces deux méthodes
+/// écrivent directement via `_isar.bookmarkEntitys.put(...)` à l'intérieur
+/// d'un `writeTxn` qu'elles ouvrent elles-mêmes.
 class BookmarkRepository {
   /// Crée le repository à partir de ses sources de données.
   BookmarkRepository({
+    required Isar isar,
     required BookmarkLocalDatasource localDatasource,
     required BookmarkRemoteDatasource remoteDatasource,
     required TagLocalDatasource tagLocalDatasource,
     Uuid uuid = const Uuid(),
-  }) : _localDatasource = localDatasource,
+  }) : _isar = isar,
+       _localDatasource = localDatasource,
        _remoteDatasource = remoteDatasource,
        _tagLocalDatasource = tagLocalDatasource,
        _uuid = uuid;
 
+  final Isar _isar;
   final BookmarkLocalDatasource _localDatasource;
   final BookmarkRemoteDatasource _remoteDatasource;
   final TagLocalDatasource _tagLocalDatasource;
@@ -157,6 +171,91 @@ class BookmarkRepository {
       await _localDatasource.deleteByRemoteId(id);
     } on Exception catch (cause) {
       _logSyncFailure(BookmarkRemoteSyncException(id, cause));
+    }
+  }
+
+  /// Supprime en une seule fois tous les bookmarks dont l'identifiant figure
+  /// dans [ids] (mode sélection multiple, Tâche 26, voir DECISIONS.md) —
+  /// même suppression douce que [deleteBookmark] (`isDeletedLocally = true`
+  /// avant confirmation distante, voir sa doc), mais dont l'écriture locale
+  /// du lot entier passe par une unique transaction Isar (voir doc de
+  /// classe), plutôt qu'une boucle de [deleteBookmark] individuels depuis la
+  /// présentation. La tentative de suppression distante reste faite id par
+  /// id après cette transaction : chaque appel réseau est indépendant et ne
+  /// doit pas faire échouer les autres.
+  Future<void> deleteBookmarks(List<String> ids) async {
+    final entities = <BookmarkEntity>[];
+    await _isar.writeTxn(() async {
+      for (final id in ids) {
+        final entity = await _localDatasource.findByRemoteId(id);
+        if (entity == null) continue;
+        entity.isDeletedLocally = true;
+        await _isar.bookmarkEntitys.put(entity);
+        entities.add(entity);
+      }
+    });
+
+    for (final entity in entities) {
+      if (entity.userId == null) continue;
+      try {
+        await _remoteDatasource.delete(entity.remoteId);
+        await _localDatasource.deleteByRemoteId(entity.remoteId);
+      } on Exception catch (cause) {
+        _logSyncFailure(BookmarkRemoteSyncException(entity.remoteId, cause));
+      }
+    }
+  }
+
+  /// Ajoute [tagsToAdd] à tous les bookmarks dont l'identifiant figure dans
+  /// [ids] (mode sélection multiple, Tâche 26, voir DECISIONS.md) : **union**
+  /// avec les tags déjà présents sur chaque bookmark, jamais un remplacement
+  /// — remplacer écraserait silencieusement les tags propres à chaque
+  /// bookmark sélectionné (voir DECISIONS.md, précision de conception de la
+  /// Tâche 26). Comparaison insensible à la casse pour éviter un doublon
+  /// visuel (même logique que `TagInputField._addTag`). Applique la même
+  /// règle de masquage automatique que [updateBookmark] si l'un des tags
+  /// finaux d'un bookmark correspond à un tag masqué (Tâche 25). Écriture
+  /// locale du lot entier dans une unique transaction Isar (voir doc de
+  /// classe) ; la synchronisation distante reste tentée id par id ensuite.
+  Future<void> addTagsToBookmarks(
+    List<String> ids,
+    List<String> tagsToAdd,
+  ) async {
+    final trimmedTagsToAdd = tagsToAdd
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+    if (trimmedTagsToAdd.isEmpty) return;
+
+    final entities = <BookmarkEntity>[];
+    await _isar.writeTxn(() async {
+      for (final id in ids) {
+        final entity = await _localDatasource.findByRemoteId(id);
+        if (entity == null) continue;
+
+        final mergedTags = List<String>.of(entity.tags);
+        for (final tag in trimmedTagsToAdd) {
+          final alreadyPresent = mergedTags.any(
+            (existing) => existing.toLowerCase() == tag.toLowerCase(),
+          );
+          if (!alreadyPresent) mergedTags.add(tag);
+        }
+
+        final hasHiddenTag = await _tagLocalDatasource.hasAnyHiddenTag(
+          mergedTags,
+        );
+        entity
+          ..tags = mergedTags
+          ..isHidden = entity.isHidden || hasHiddenTag
+          ..updatedAt = DateTime.now()
+          ..isSynced = false;
+        await _isar.bookmarkEntitys.put(entity);
+        entities.add(entity);
+      }
+    });
+
+    for (final entity in entities) {
+      await _trySyncUpdate(entity);
     }
   }
 

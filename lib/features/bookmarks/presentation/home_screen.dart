@@ -4,11 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'bookmark_card.dart';
 import 'bookmark_context_menu.dart';
 import 'bookmark_list_provider.dart';
+import 'bookmark_selection_controller.dart';
 import 'bookmark_tag_filter_provider.dart';
+import 'bulk_selection_toolbar.dart';
 import 'clipboard_suggestion_banner.dart';
 import 'manual_add_dialog.dart';
 import 'my_eyes_only_access.dart';
 import 'open_bookmark_action.dart';
+
+/// Sélection multiple de cet écran (Tâche 26, voir DECISIONS.md) — instance
+/// distincte de celle de `SearchScreen`, voir [BookmarkSelectionScope].
+const _selectionScope = BookmarkSelectionScope.home;
 
 /// Écran d'accueil : liste chronologique (date de création décroissante) de
 /// tous les bookmarks non supprimés et non masqués (voir SPEC.md section
@@ -43,6 +49,14 @@ import 'open_bookmark_action.dart';
 /// `openMyEyesOnly` (Tâche 22, voir DECISIONS.md) l'ouverture de la section
 /// de bookmarks masqués, protégée par un code — point d'entrée
 /// volontairement discret, sans onglet dédié dans `AppShell`.
+///
+/// **Mode sélection multiple (Tâche 26, voir DECISIONS.md) :** une icône
+/// dédiée de l'`AppBar` active/désactive le mode (voir
+/// `BookmarkSelectionController`, instance propre à cet écran via
+/// [_selectionScope]) ; une fois actif, chaque `BookmarkCard` affiche une
+/// case à cocher et `BulkSelectionToolbar` apparaît en bas dès qu'au moins
+/// un bookmark est coché. Aucune action de masquage n'y est jamais exposée
+/// (voir `BulkSelectionToolbar`).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -50,6 +64,12 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bookmarksAsync = ref.watch(bookmarkListProvider);
     final tagFilter = ref.watch(bookmarkTagFilterProvider);
+    final selection = ref.watch(
+      bookmarkSelectionControllerProvider(_selectionScope),
+    );
+    final selectionNotifier = ref.read(
+      bookmarkSelectionControllerProvider(_selectionScope).notifier,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -57,6 +77,17 @@ class HomeScreen extends ConsumerWidget {
           onLongPress: () => openMyEyesOnly(context, ref),
           child: const Text('Runk'),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              selection.isSelectionModeActive ? Icons.close : Icons.checklist,
+            ),
+            tooltip: selection.isSelectionModeActive
+                ? 'Annuler la sélection'
+                : 'Sélectionner des bookmarks',
+            onPressed: selectionNotifier.toggleSelectionMode,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -89,7 +120,9 @@ class HomeScreen extends ConsumerWidget {
                 final bookmarks = tagFilter == null
                     ? visibleBookmarks
                     : visibleBookmarks
-                          .where((bookmark) => bookmark.tags.contains(tagFilter))
+                          .where(
+                            (bookmark) => bookmark.tags.contains(tagFilter),
+                          )
                           .toList();
                 if (bookmarks.isEmpty) {
                   return Center(
@@ -116,6 +149,12 @@ class HomeScreen extends ConsumerWidget {
                           onTap: () => openBookmark(context, ref, bookmark),
                           onLongPress: () =>
                               showBookmarkContextMenu(context, ref, bookmark),
+                          selectionMode: selection.isSelectionModeActive,
+                          isSelected: selection.selectedIds.contains(
+                            bookmark.id,
+                          ),
+                          onToggleSelection: (_) =>
+                              selectionNotifier.toggleSelected(bookmark.id),
                         ),
                       );
                     },
@@ -130,6 +169,9 @@ class HomeScreen extends ConsumerWidget {
         onPressed: () => ManualAddDialog.show(context),
         child: const Icon(Icons.add),
       ),
+      bottomNavigationBar: selection.selectedIds.isEmpty
+          ? null
+          : const BulkSelectionToolbar(scope: _selectionScope),
     );
   }
 }

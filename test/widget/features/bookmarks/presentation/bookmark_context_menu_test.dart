@@ -73,6 +73,7 @@ void main() {
     // d'`updateBookmark`/`deleteBookmark`, pas sur une simulation de leur
     // effet.
     repository = BookmarkRepository(
+      isar: isar,
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
       tagLocalDatasource: TagLocalDatasource(isar),

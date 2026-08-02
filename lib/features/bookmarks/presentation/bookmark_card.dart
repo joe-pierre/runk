@@ -16,81 +16,123 @@ import '../domain/video_bookmark.dart';
 /// suit le même principe (Tâche 21) : branché par `HomeScreen` sur
 /// `showBookmarkContextMenu`, jamais d'appel direct à `BookmarkRepository`
 /// depuis ce fichier.
+///
+/// **Mode sélection multiple (Tâche 26, voir DECISIONS.md) :** quand
+/// [selectionMode] est vrai, une case à cocher apparaît en superposition
+/// (état porté par [isSelected]), le tap sur la carte appelle
+/// [onToggleSelection] au lieu de [onTap], et [onLongPress] est ignoré — pas
+/// de menu contextuel individuel pendant une sélection multiple, pour éviter
+/// toute ambiguïté. Un seul widget, jamais de duplication : ce mode n'est
+/// qu'un affichage différent du même `BookmarkCard`.
 class BookmarkCard extends StatelessWidget {
   /// Crée la carte pour [bookmark]. [onTap] est appelé au tap sur la carte,
-  /// [onLongPress] à l'appui long.
+  /// [onLongPress] à l'appui long (tous deux ignorés si [selectionMode] est
+  /// vrai, voir doc de classe).
   const BookmarkCard({
     super.key,
     required this.bookmark,
     this.onTap,
     this.onLongPress,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onToggleSelection,
   });
 
   /// Bookmark à afficher.
   final VideoBookmark bookmark;
 
   /// Appelé au tap sur la carte, ou `null` si aucune action n'est branchée.
+  /// Ignoré si [selectionMode] est vrai (voir [onToggleSelection]).
   final VoidCallback? onTap;
 
   /// Appelé à l'appui long sur la carte, ou `null` si aucune action n'est
   /// branchée. Geste distinct du tap simple (`onTap`) — `InkWell` gère
   /// nativement la désambiguïsation entre les deux, aucune interférence.
+  /// Ignoré si [selectionMode] est vrai (voir doc de classe).
   final VoidCallback? onLongPress;
+
+  /// Vrai si la carte doit s'afficher en mode sélection multiple (Tâche 26).
+  final bool selectionMode;
+
+  /// Vrai si ce bookmark est actuellement coché — sans effet si
+  /// [selectionMode] est faux.
+  final bool isSelected;
+
+  /// Appelé quand [selectionMode] est actif et que l'utilisateur tape la
+  /// carte ou la case à cocher, avec le nouvel état de sélection souhaité
+  /// (inverse de [isSelected]).
+  final ValueChanged<bool>? onToggleSelection;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _BookmarkThumbnail(bookmark: bookmark),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: selectionMode
+                ? () => onToggleSelection?.call(!isSelected)
+                : onTap,
+            onLongPress: selectionMode ? null : onLongPress,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(selectionMode ? 40 : 8, 8, 8, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _BookmarkThumbnail(bookmark: bookmark),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(_platformIcon(bookmark.source), size: 16),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            bookmark.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                        Row(
+                          children: [
+                            Icon(_platformIcon(bookmark.source), size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                bookmark.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                          ],
                         ),
+                        if (bookmark.tags.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              for (final tag in bookmark.tags)
+                                Chip(
+                                  label: Text(tag),
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
-                    if (bookmark.tags.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          for (final tag in bookmark.tags)
-                            Chip(
-                              label: Text(tag),
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          if (selectionMode)
+            Positioned(
+              top: 4,
+              left: 4,
+              child: Checkbox(
+                value: isSelected,
+                onChanged: (checked) =>
+                    onToggleSelection?.call(checked ?? false),
+              ),
+            ),
+        ],
       ),
     );
   }

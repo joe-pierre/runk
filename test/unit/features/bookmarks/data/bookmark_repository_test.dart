@@ -103,6 +103,7 @@ void main() {
     tagLocalDatasource = TagLocalDatasource(isar);
     remoteDatasource = FakeBookmarkRemoteDatasource();
     repository = BookmarkRepository(
+      isar: isar,
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
       tagLocalDatasource: tagLocalDatasource,
@@ -550,5 +551,101 @@ void main() {
         expect(noMatch, isEmpty);
       },
     );
+  });
+
+  group('deleteBookmarks (Tâche 26 — sélection multiple)', () {
+    test('supprime tous les bookmarks dont l\'identifiant est fourni, en '
+        'laissant les autres intacts', () async {
+      final first = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=1',
+        title: 'Un',
+        source: VideoSource.youtube,
+      );
+      final second = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=2',
+        title: 'Deux',
+        source: VideoSource.youtube,
+      );
+      final third = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=3',
+        title: 'Trois',
+        source: VideoSource.youtube,
+      );
+
+      await repository.deleteBookmarks([first.id, second.id]);
+
+      final remaining = await repository.getAllBookmarks();
+      expect(remaining.map((b) => b.id), [third.id]);
+    });
+
+    test('ignore silencieusement un identifiant inconnu parmi le lot',
+        () async {
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=1',
+        title: 'Un',
+        source: VideoSource.youtube,
+      );
+
+      await repository.deleteBookmarks([created.id, 'id-inexistant']);
+
+      expect(await repository.getAllBookmarks(), isEmpty);
+    });
+  });
+
+  group('addTagsToBookmarks (Tâche 26 — sélection multiple)', () {
+    test('ajoute les tags en union avec les tags existants, sans doublon '
+        'insensible à la casse, sans toucher aux bookmarks non '
+        'sélectionnés', () async {
+      final first = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=1',
+        title: 'Un',
+        source: VideoSource.youtube,
+        tags: const ['Existant'],
+      );
+      final second = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=2',
+        title: 'Deux',
+        source: VideoSource.youtube,
+      );
+      final untouched = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=3',
+        title: 'Trois',
+        source: VideoSource.youtube,
+        tags: const ['seul'],
+      );
+
+      await repository.addTagsToBookmarks(
+        [first.id, second.id],
+        ['existant', 'nouveau'],
+      );
+
+      final bookmarks = await repository.getAllBookmarks();
+      final updatedFirst = bookmarks.firstWhere((b) => b.id == first.id);
+      final updatedSecond = bookmarks.firstWhere((b) => b.id == second.id);
+      final updatedThird = bookmarks.firstWhere((b) => b.id == untouched.id);
+
+      expect(updatedFirst.tags, ['Existant', 'nouveau']);
+      expect(updatedSecond.tags, ['existant', 'nouveau']);
+      expect(updatedThird.tags, ['seul']);
+    });
+
+    test('force isHidden: true si l\'un des tags ajoutés est un tag masqué '
+        '(Tâche 25)', () async {
+      await tagLocalDatasource.upsert(
+        TagEntity()
+          ..name = 'secret'
+          ..isHidden = true,
+      );
+      final created = await repository.createBookmark(
+        url: 'https://www.youtube.com/watch?v=1',
+        title: 'Un',
+        source: VideoSource.youtube,
+      );
+
+      await repository.addTagsToBookmarks([created.id], ['secret']);
+
+      final bookmarks = await repository.getAllBookmarks();
+      expect(bookmarks.single.isHidden, isTrue);
+    });
   });
 }
