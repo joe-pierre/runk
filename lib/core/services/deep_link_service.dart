@@ -7,18 +7,25 @@ import '../models/video_source.dart';
 /// automatique vers le navigateur (voir SPEC.md section 4 règle 5).
 ///
 /// **Schémas natifs non officiels.** Les schémas utilisés ici
-/// (`instagram://`, `snssdk1233://` pour TikTok, `fb://`, `twitter://`,
-/// `vnd.youtube://`) ne sont documentés par aucune des plateformes cibles :
-/// ce sont des conventions observées, susceptibles de changer ou de cesser
-/// de fonctionner sans préavis à la discrétion de l'éditeur de chaque app.
-/// Pour TikTok et X/Twitter, ces conventions attendent en plus un
-/// identifiant numérique précis extrait du chemin de l'URL (voir
-/// `_nativeUriFor`) plutôt qu'une simple reconstruction hôte/chemin — si cet
-/// identifiant est introuvable, aucun schéma natif n'est tenté. Threads n'a,
-/// à la connaissance de ce projet, aucun schéma connu — le repli navigateur
-/// y est donc systématique. Voir `BUGS_AND_ROADMAP.md` ("Les schémas de deep
-/// link natifs... peuvent changer sans préavis") pour le suivi de cette
-/// fragilité dans le temps.
+/// (`instagram://`, `snssdk1233://` pour TikTok, `fb://`, `vnd.youtube://`)
+/// ne sont documentés par aucune des plateformes cibles : ce sont des
+/// conventions observées, susceptibles de changer ou de cesser de
+/// fonctionner sans préavis à la discrétion de l'éditeur de chaque app.
+/// Pour TikTok, cette convention attend en plus un identifiant numérique
+/// précis extrait du chemin de l'URL (voir `_nativeUriFor`) plutôt qu'une
+/// simple reconstruction hôte/chemin — si cet identifiant est introuvable,
+/// aucun schéma natif n'est tenté. Threads et X/Twitter n'ont, à la
+/// connaissance de ce projet, aucun schéma natif tenté — le repli navigateur
+/// y est donc systématique. Threads n'a jamais eu de schéma connu ; X/Twitter
+/// en avait un (`twitter://status?id=<id>`, voir Tâche 32) mais celui-ci a
+/// été abandonné (Tâche 36) après vérification manuelle en usage réel :
+/// il rouvre l'app sur son accueil plutôt que sur le post visé, X n'ayant
+/// jamais officiellement documenté ni garanti ce schéma depuis 2016 — les
+/// liens `https://x.com/...` bénéficient au contraire des Universal Links
+/// (iOS) / App Links (Android), associés officiellement au domaine `x.com`,
+/// nettement plus fiables pour ouvrir un post précis. Voir
+/// `BUGS_AND_ROADMAP.md` ("Les schémas de deep link natifs... peuvent
+/// changer sans préavis") pour le suivi de cette fragilité dans le temps.
 ///
 /// Le repli navigateur (`url_launcher`, `LaunchMode.externalApplication`)
 /// n'est jamais optionnel : il s'exécute systématiquement si le schéma
@@ -74,17 +81,15 @@ class DeepLinkService {
     }
   }
 
-  /// Id numérique en fin de chemin après `/status/` (X/Twitter).
-  static final RegExp _twitterStatusIdPattern = RegExp(r'/status/(\d+)');
-
   /// Id numérique en fin de chemin après `/video/` (TikTok).
   static final RegExp _tiktokVideoIdPattern = RegExp(r'/video/(\d+)');
 
   /// Construit l'URI du schéma natif de [source] pour [url], ou `null` si
-  /// aucun schéma n'est connu pour cette plateforme (Threads, ou source
-  /// [VideoSource.unknown]), ou si l'identifiant précis attendu par le
-  /// schéma (TikTok, X/Twitter) est introuvable dans [url] — dans ce cas,
-  /// [openInSource] passe directement au repli navigateur.
+  /// aucun schéma natif n'est tenté pour cette plateforme (Threads, X/Twitter
+  /// — voir doc de classe —, ou source [VideoSource.unknown]), ou si
+  /// l'identifiant précis attendu par le schéma (TikTok) est introuvable
+  /// dans [url] — dans ce cas, [openInSource] passe directement au repli
+  /// navigateur.
   Uri? _nativeUriFor(String url, VideoSource source) {
     final original = Uri.tryParse(url);
     if (original == null) return null;
@@ -106,12 +111,6 @@ class DeepLinkService {
         final id = _tiktokVideoIdPattern.firstMatch(original.path)?.group(1);
         if (id == null) return null;
         return Uri.tryParse('snssdk1233://aweme/detail/$id?refer=web');
-      case VideoSource.twitter:
-        // Schéma tiers attendant l'id numérique du statut, pas une simple
-        // reconstruction hôte/chemin (voir doc de classe).
-        final id = _twitterStatusIdPattern.firstMatch(original.path)?.group(1);
-        if (id == null) return null;
-        return Uri.tryParse('twitter://status?id=$id');
       case VideoSource.facebook:
         // Schéma spécifique documenté par des tiers pour ouvrir une URL
         // Facebook arbitraire (pas de simple reconstruction hôte/chemin).
@@ -119,7 +118,12 @@ class DeepLinkService {
       case VideoSource.youtube:
         return Uri.tryParse(rebuild('vnd.youtube'));
       case VideoSource.threads:
+      case VideoSource.twitter:
       case VideoSource.unknown:
+        // Threads : aucun schéma natif connu. X/Twitter : schéma
+        // `twitter://` abandonné (Tâche 36, voir doc de classe) au profit
+        // du repli direct vers le lien https, plus fiable via les Universal
+        // Links/App Links associées à x.com.
         return null;
     }
   }
