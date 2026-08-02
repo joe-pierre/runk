@@ -11,6 +11,7 @@ import 'package:runk/features/bookmarks/data/bookmark_repository_provider.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/hidden_bookmark_menu_button.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 
 import '../../../../unit/features/bookmarks/data/bookmark_repository_test.dart'
     show FakeBookmarkRemoteDatasource;
@@ -27,13 +28,14 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
     repository = BookmarkRepository(
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
+      tagLocalDatasource: TagLocalDatasource(isar),
     );
   });
 

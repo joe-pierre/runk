@@ -82,6 +82,15 @@ class _FakeTagRepository implements TagRepository {
       (existing) => existing.toLowerCase() == name.toLowerCase(),
     );
   }
+
+  @override
+  Future<List<String>> getHiddenTagNames() async => const [];
+
+  @override
+  Future<void> hideTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> unhideTag(String name) => throw UnimplementedError();
 }
 
 void main() {
@@ -91,59 +100,52 @@ void main() {
   // vigilance techniques identifiés", entrée Tâche 10, pour le détail et
   // l'hypothèse de cause. À reprendre comme bug dédié, ne pas supprimer ce
   // test.
-  testWidgets(
-    'un tap sur un tag active le filtre puis revient sur Home',
-    (tester) async {
-      final bookmark = VideoBookmark(
-        id: '1',
-        url: 'https://www.youtube.com/watch?v=abc',
-        title: 'Vidéo',
-        source: VideoSource.youtube,
-        createdAt: DateTime(2026),
-        updatedAt: DateTime(2026),
-        tags: const ['cuisine'],
-      );
-      final container = ProviderContainer(
-        overrides: [
-          bookmarkListProvider.overrideWith(
-            () => _FakeBookmarkList([bookmark]),
-          ),
-          tagRepositoryProvider.overrideWith(
-            (ref) async => _FakeTagRepository(const []),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      final router = GoRouter(
-        initialLocation: '/tags',
-        routes: [
-          GoRoute(path: '/', builder: (context, state) => const Text('Home')),
-          GoRoute(
-            path: '/tags',
-            builder: (context, state) => const TagsScreen(),
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(routerConfig: router),
+  testWidgets('un tap sur un tag active le filtre puis revient sur Home', (
+    tester,
+  ) async {
+    final bookmark = VideoBookmark(
+      id: '1',
+      url: 'https://www.youtube.com/watch?v=abc',
+      title: 'Vidéo',
+      source: VideoSource.youtube,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+      tags: const ['cuisine'],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        bookmarkListProvider.overrideWith(() => _FakeBookmarkList([bookmark])),
+        tagRepositoryProvider.overrideWith(
+          (ref) async => _FakeTagRepository(const []),
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
+    addTearDown(container.dispose);
 
-      expect(find.text('cuisine'), findsOneWidget);
+    final router = GoRouter(
+      initialLocation: '/tags',
+      routes: [
+        GoRoute(path: '/', builder: (context, state) => const Text('Home')),
+        GoRoute(path: '/tags', builder: (context, state) => const TagsScreen()),
+      ],
+    );
 
-      await tester.tap(find.text('cuisine'));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(container.read(bookmarkTagFilterProvider), 'cuisine');
-      expect(find.text('Home'), findsOneWidget);
-    },
-    skip: true,
-  );
+    expect(find.text('cuisine'), findsOneWidget);
+
+    await tester.tap(find.text('cuisine'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(bookmarkTagFilterProvider), 'cuisine');
+    expect(find.text('Home'), findsOneWidget);
+  }, skip: true);
 
   testWidgets('affiche un message quand aucun tag n\'existe', (tester) async {
     final container = ProviderContainer(
@@ -170,45 +172,38 @@ void main() {
     );
   });
 
-  testWidgets(
-    'le bouton d\'ajout crée un tag géré, visible immédiatement sans '
-    'aucun bookmark associé',
-    (tester) async {
-      final container = ProviderContainer(
-        overrides: [
-          bookmarkListProvider.overrideWith(
-            () => _FakeBookmarkList(const []),
-          ),
-          tagRepositoryProvider.overrideWith(
-            (ref) async => _FakeTagRepository(const []),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(home: TagsScreen()),
+  testWidgets('le bouton d\'ajout crée un tag géré, visible immédiatement sans '
+      'aucun bookmark associé', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
+        tagRepositoryProvider.overrideWith(
+          (ref) async => _FakeTagRepository(const []),
         ),
-      );
-      await tester.pumpAndSettle();
+      ],
+    );
+    addTearDown(container.dispose);
 
-      expect(find.text('randonnée'), findsNothing);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TagsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Ajouter un tag'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'randonnée');
-      await tester.tap(find.text('Valider'));
-      await tester.pumpAndSettle();
+    expect(find.text('randonnée'), findsNothing);
 
-      expect(find.text('randonnée'), findsOneWidget);
-    },
-  );
+    await tester.tap(find.byTooltip('Ajouter un tag'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'randonnée');
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
 
-  testWidgets('renommer un tag met à jour son libellé affiché', (
-    tester,
-  ) async {
+    expect(find.text('randonnée'), findsOneWidget);
+  });
+
+  testWidgets('renommer un tag met à jour son libellé affiché', (tester) async {
     final container = ProviderContainer(
       overrides: [
         bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
@@ -248,9 +243,7 @@ void main() {
         ..countForNextDeletion = 2;
       final container = ProviderContainer(
         overrides: [
-          bookmarkListProvider.overrideWith(
-            () => _FakeBookmarkList(const []),
-          ),
+          bookmarkListProvider.overrideWith(() => _FakeBookmarkList(const [])),
           tagRepositoryProvider.overrideWith((ref) async => fakeTagRepository),
         ],
       );

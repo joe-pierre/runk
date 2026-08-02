@@ -17,6 +17,14 @@ import 'tag_local_datasource.dart';
 ///   de [TagEntity] (visible uniquement parce qu'un bookmark le porte) en
 ///   crée un implicitement.
 ///
+/// Étend en Tâche 25 (voir DECISIONS.md) le masquage "My Eyes Only" (Tâche
+/// 22) aux tags eux-mêmes : [hideTag]/[unhideTag] masquent/démasquent en
+/// cascade tous les `BookmarkEntity` qui portent le tag, existants et
+/// futurs (l'auto-masquage à la création/édition d'un bookmark vit dans
+/// `BookmarkRepository`, voir sa doc de classe). Jamais accessible ni
+/// visible depuis le menu normal (`TagsScreen`/`tag_action_dialogs.dart`) —
+/// uniquement depuis l'espace privé déjà déverrouillé.
+///
 /// **Contrainte technique Isar (justifie l'accès direct à [Isar] ici) :**
 /// Isar interdit les transactions imbriquées (`writeTxn` dans un `writeTxn`
 /// actif lève une `IsarError`, voir doc du package). Pour que le renommage
@@ -50,12 +58,31 @@ class TagRepository {
   final TagLocalDatasource _tagLocalDatasource;
   final BookmarkLocalDatasource _bookmarkLocalDatasource;
 
-  /// Retourne les noms de tous les tags gérés (ayant un [TagEntity]),
-  /// utilisé par `distinctTagsProvider` pour fusionner avec les tags dérivés
-  /// des bookmarks (voir DECISIONS.md, entrée « Tâche 15 »).
+  /// Retourne les noms de tous les tags gérés **visibles** (ayant un
+  /// [TagEntity], `isHidden == false`), utilisé par `distinctTagsProvider`
+  /// pour fusionner avec les tags dérivés des bookmarks (voir DECISIONS.md,
+  /// entrée « Tâche 15 »). Exclut les tags masqués (`isHidden == true`,
+  /// Tâche 25) — un tag masqué ne doit jamais apparaître dans
+  /// `TagsScreen`/l'autocomplétion, voir [getHiddenTagNames] pour la liste
+  /// symétrique.
   Future<List<String>> getManagedTagNames() async {
     final entities = await _tagLocalDatasource.getAll();
-    return entities.map((entity) => entity.name).toList();
+    return entities
+        .where((entity) => !entity.isHidden)
+        .map((entity) => entity.name)
+        .toList();
+  }
+
+  /// Retourne les noms de tous les tags masqués (`TagEntity.isHidden ==
+  /// true`, Tâche 25, voir DECISIONS.md) — utilisé exclusivement par
+  /// `MyEyesOnlyScreen` (`hiddenTagsProvider`), jamais par `TagsScreen` ni
+  /// l'autocomplétion.
+  Future<List<String>> getHiddenTagNames() async {
+    final entities = await _tagLocalDatasource.getAll();
+    return entities
+        .where((entity) => entity.isHidden)
+        .map((entity) => entity.name)
+        .toList();
   }
 
   /// Crée un tag géré nommé [name]. No-op silencieux si un tag équivalent
@@ -138,6 +165,86 @@ class TagRepository {
           ..tags = bookmark.tags
               .where((tag) => tag.toLowerCase() != normalizedName)
               .toList()
+          ..updatedAt = now
+          ..isSynced = false;
+        await _isar.bookmarkEntitys.put(bookmark);
+      }
+    });
+  }
+
+  /// Masque le tag [name] (Tâche 25, voir DECISIONS.md) : crée son
+  /// [TagEntity] s'il n'existe pas encore (tag purement dérivé, même logique
+  /// que [renameTag]) et le marque `isHidden: true`, puis marque `isHidden:
+  /// true` sur tous les `BookmarkEntity.tags` qui le portent (comparaison
+  /// insensible à la casse) — dans une unique transaction Isar (voir doc de
+  /// classe). S'applique aussi bien aux bookmarks déjà existants qu'à tout
+  /// bookmark qui recevra ce tag plus tard (voir `BookmarkRepository`, qui
+  /// consulte ce même [TagEntity.isHidden] à la création/édition).
+  Future<void> hideTag(String name) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) return;
+
+    await _isar.writeTxn(() async {
+      final existingTag = await _tagLocalDatasource.findByName(trimmedName);
+      if (existingTag != null) {
+        existingTag.isHidden = true;
+        await _isar.tagEntitys.put(existingTag);
+      } else {
+        await _isar.tagEntitys.put(
+          TagEntity()
+            ..name = trimmedName
+            ..isHidden = true,
+        );
+      }
+
+      final affectedBookmarks = await _bookmarkLocalDatasource.findAllByTag(
+        trimmedName,
+      );
+      final now = DateTime.now();
+      for (final bookmark in affectedBookmarks) {
+        bookmark
+          ..isHidden = true
+          ..updatedAt = now
+          ..isSynced = false;
+        await _isar.bookmarkEntitys.put(bookmark);
+      }
+    });
+  }
+
+  /// Démasque le tag [name] (symétrique de [hideTag]) : marque son
+  /// [TagEntity] `isHidden: false`, puis démasque tous les
+  /// `BookmarkEntity.tags` qui le portent — **sauf** ceux qui portent encore
+  /// un autre tag masqué (revérifié via [TagLocalDatasource.hasAnyHiddenTag]
+  /// après la mise à jour de ce [TagEntity], dans la même transaction),
+  /// pour ne jamais rendre visible un bookmark que le masquage d'un autre
+  /// tag continue légitimement de masquer.
+  ///
+  /// **Limite assumée, non résolue par cette tâche** (voir DECISIONS.md,
+  /// entrée « Tâche 25 ») : si un bookmark est masqué à la fois
+  /// individuellement (Tâche 24, `HiddenBookmarkMenuButton`/
+  /// `AddToMyEyesOnlyScreen`) et via ce tag, démasquer le tag le rend
+  /// visible à nouveau aussi — aucun mécanisme ne distingue *pourquoi* un
+  /// bookmark est masqué.
+  Future<void> unhideTag(String name) async {
+    await _isar.writeTxn(() async {
+      final existingTag = await _tagLocalDatasource.findByName(name);
+      if (existingTag != null) {
+        existingTag.isHidden = false;
+        await _isar.tagEntitys.put(existingTag);
+      }
+
+      final affectedBookmarks = await _bookmarkLocalDatasource.findAllByTag(
+        name,
+      );
+      final now = DateTime.now();
+      for (final bookmark in affectedBookmarks) {
+        final stillHasHiddenTag = await _tagLocalDatasource.hasAnyHiddenTag(
+          bookmark.tags,
+        );
+        if (stillHasHiddenTag) continue;
+
+        bookmark
+          ..isHidden = false
           ..updatedAt = now
           ..isSynced = false;
         await _isar.bookmarkEntitys.put(bookmark);

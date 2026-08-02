@@ -21,6 +21,15 @@ class TagEntity {
   /// actée pour l'autocomplétion (voir DECISIONS.md, entrée « Tâche 13 »).
   @Index(unique: true, caseSensitive: false)
   late String name;
+
+  /// Vrai si ce tag est masqué depuis l'espace privé "My Eyes Only" (Tâche
+  /// 25, voir DECISIONS.md) : masque en cascade tous les bookmarks qui le
+  /// portent, existants et futurs (voir `TagRepository.hideTag` et
+  /// `BookmarkRepository.createBookmark`/`updateBookmark`). Jamais
+  /// accessible ni visible depuis le menu normal (`TagsScreen`/
+  /// `tag_action_dialogs.dart`), uniquement depuis l'espace privé déjà
+  /// déverrouillé — même principe que `BookmarkEntity.isHidden` (Tâche 22).
+  bool isHidden = false;
 }
 
 /// Accès à la collection Isar `TagEntity`.
@@ -45,7 +54,10 @@ class TagLocalDatasource {
   /// l'intérieur d'une transaction déjà active sur la même instance [Isar]
   /// (voir `TagRepository.renameTag`/`deleteTag`).
   Future<TagEntity?> findByName(String name) {
-    return _isar.tagEntitys.filter().nameEqualTo(name, caseSensitive: false).findFirst();
+    return _isar.tagEntitys
+        .filter()
+        .nameEqualTo(name, caseSensitive: false)
+        .findFirst();
   }
 
   /// Retourne tous les tags gérés.
@@ -62,5 +74,21 @@ class TagLocalDatasource {
   /// l'instance partagée.
   Future<void> upsert(TagEntity entity) {
     return _isar.writeTxn(() => _isar.tagEntitys.put(entity));
+  }
+
+  /// Retourne vrai si au moins un nom parmi [tagNames] correspond à un
+  /// [TagEntity] marqué `isHidden: true` (comparaison insensible à la casse,
+  /// même logique que [findByName]) — utilisé par `BookmarkRepository` pour
+  /// masquer automatiquement un bookmark qui reçoit un tag masqué, à la
+  /// création comme à l'édition (voir DECISIONS.md, entrée « Tâche 25 »).
+  /// Lecture pure (aucune transaction d'écriture ouverte) : peut être
+  /// appelée aussi bien en dehors que depuis l'intérieur d'une transaction
+  /// déjà active sur la même instance [Isar].
+  Future<bool> hasAnyHiddenTag(List<String> tagNames) async {
+    for (final tagName in tagNames) {
+      final entity = await findByName(tagName);
+      if (entity != null && entity.isHidden) return true;
+    }
+    return false;
   }
 }

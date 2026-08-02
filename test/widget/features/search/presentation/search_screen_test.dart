@@ -12,6 +12,7 @@ import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository_provider.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_search_provider.dart';
 import 'package:runk/features/search/presentation/search_screen.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../unit/features/bookmarks/data/bookmark_repository_test.dart'
@@ -29,13 +30,14 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
     repository = BookmarkRepository(
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
+      tagLocalDatasource: TagLocalDatasource(isar),
     );
   });
 

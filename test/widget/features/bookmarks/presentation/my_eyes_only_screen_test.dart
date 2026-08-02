@@ -5,6 +5,9 @@ import 'package:runk/core/models/video_source.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/bookmark_list_provider.dart';
 import 'package:runk/features/bookmarks/presentation/my_eyes_only_screen.dart';
+import 'package:runk/features/tags/data/tag_repository.dart';
+import 'package:runk/features/tags/data/tag_repository_provider.dart';
+import 'package:runk/features/tags/presentation/hidden_tags_provider.dart';
 
 /// Notifier de test qui court-circuite `BookmarkRepository` (donc Isar et
 /// Supabase) — même pattern que `home_screen_test.dart`.
@@ -15,6 +18,38 @@ class _FakeBookmarkList extends BookmarkList {
 
   @override
   Future<List<VideoBookmark>> build() async => _bookmarks;
+}
+
+/// Court-circuite `TagRepository` (donc Isar) — `MyEyesOnlyScreen` consulte
+/// désormais `hiddenTagsProvider` (Tâche 25, voir DECISIONS.md), qui en
+/// dépend. Aucun tag masqué dans ces tests : seul le comportement des
+/// bookmarks masqués est exercé ici (voir `hidden_tag_list_tile_test.dart`
+/// pour la section "Tags masqués" elle-même).
+class _FakeTagRepository implements TagRepository {
+  @override
+  Future<List<String>> getManagedTagNames() async => const [];
+
+  @override
+  Future<List<String>> getHiddenTagNames() async => const [];
+
+  @override
+  Future<void> createTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<int> countBookmarksForTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> renameTag(String oldName, String newName) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> deleteTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> hideTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> unhideTag(String name) => throw UnimplementedError();
 }
 
 void main() {
@@ -34,6 +69,9 @@ void main() {
       ProviderScope(
         overrides: [
           bookmarkListProvider.overrideWith(() => _FakeBookmarkList([visible])),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(),
+          ),
         ],
         child: const MaterialApp(home: MyEyesOnlyScreen()),
       ),
@@ -70,6 +108,9 @@ void main() {
           bookmarkListProvider.overrideWith(
             () => _FakeBookmarkList([visible, hidden]),
           ),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(),
+          ),
         ],
         child: const MaterialApp(home: MyEyesOnlyScreen()),
       ),
@@ -97,6 +138,9 @@ void main() {
       ProviderScope(
         overrides: [
           bookmarkListProvider.overrideWith(() => _FakeBookmarkList([hidden])),
+          tagRepositoryProvider.overrideWith(
+            (ref) async => _FakeTagRepository(),
+          ),
         ],
         child: const MaterialApp(home: MyEyesOnlyScreen()),
       ),
@@ -108,4 +152,46 @@ void main() {
 
     expect(find.text('Ajouter à My Eyes Only'), findsOneWidget);
   });
+
+  testWidgets(
+    'n\'affiche aucune section "Tags masqués" tant qu\'aucun tag n\'est '
+    'masqué',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(() => _FakeBookmarkList([])),
+            tagRepositoryProvider.overrideWith(
+              (ref) async => _FakeTagRepository(),
+            ),
+          ],
+          child: const MaterialApp(home: MyEyesOnlyScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tags masqués'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'affiche la section "Tags masqués" (Tâche 25) avec une action "Ne plus '
+    'masquer ce tag" par tag',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(() => _FakeBookmarkList([])),
+            hiddenTagsProvider.overrideWith((ref) async => const ['secret']),
+          ],
+          child: const MaterialApp(home: MyEyesOnlyScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tags masqués'), findsOneWidget);
+      expect(find.text('secret'), findsOneWidget);
+      expect(find.byTooltip('Ne plus masquer ce tag'), findsOneWidget);
+    },
+  );
 }

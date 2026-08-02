@@ -10,6 +10,9 @@ import 'package:runk/features/bookmarks/data/bookmark_repository.dart';
 import 'package:runk/features/bookmarks/data/bookmark_repository_provider.dart';
 import 'package:runk/features/bookmarks/domain/video_bookmark.dart';
 import 'package:runk/features/bookmarks/presentation/add_to_my_eyes_only_screen.dart';
+import 'package:runk/features/tags/data/tag_local_datasource.dart';
+import 'package:runk/features/tags/data/tag_repository.dart';
+import 'package:runk/features/tags/data/tag_repository_provider.dart';
 
 import '../../../../unit/features/bookmarks/data/bookmark_repository_test.dart'
     show FakeBookmarkRemoteDatasource;
@@ -18,6 +21,7 @@ void main() {
   late Directory tempDirectory;
   late Isar isar;
   late BookmarkRepository repository;
+  late TagRepository tagRepository;
 
   setUpAll(() async {
     await Isar.initializeIsarCore(download: true);
@@ -26,13 +30,21 @@ void main() {
   setUp(() async {
     tempDirectory = Directory.systemTemp.createTempSync('runk_isar_test');
     isar = await Isar.open(
-      [BookmarkEntitySchema],
+      [BookmarkEntitySchema, TagEntitySchema],
       directory: tempDirectory.path,
       inspector: false,
     );
+    final bookmarkLocalDatasource = BookmarkLocalDatasource(isar);
+    final tagLocalDatasource = TagLocalDatasource(isar);
     repository = BookmarkRepository(
-      localDatasource: BookmarkLocalDatasource(isar),
+      localDatasource: bookmarkLocalDatasource,
       remoteDatasource: FakeBookmarkRemoteDatasource(),
+      tagLocalDatasource: tagLocalDatasource,
+    );
+    tagRepository = TagRepository(
+      isar: isar,
+      tagLocalDatasource: tagLocalDatasource,
+      bookmarkLocalDatasource: bookmarkLocalDatasource,
     );
   });
 
@@ -62,6 +74,7 @@ void main() {
       ProviderScope(
         overrides: [
           bookmarkRepositoryProvider.overrideWith((ref) async => repository),
+          tagRepositoryProvider.overrideWith((ref) async => tagRepository),
         ],
         child: MaterialApp(
           home: Scaffold(
@@ -162,6 +175,49 @@ void main() {
         // Retour à l'écran précédent une fois la sélection masquée.
         expect(find.text('Ajouter à My Eyes Only'), findsNothing);
         expect(find.text('Ouvrir'), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets(
+    'le mode "Tags" (Tâche 25) affiche HideTagListView et masque le bouton '
+    '"Masquer la sélection"',
+    (tester) async {
+      await tester.runAsync(() async {
+        await repository.createBookmark(
+          url: 'https://www.youtube.com/watch?v=abc',
+          title: 'Vidéo',
+          source: VideoSource.youtube,
+          tags: const ['cuisine'],
+        );
+
+        await pumpAndOpenScreen(tester);
+        expect(find.text('Vidéo'), findsOneWidget);
+
+        await tester.tap(find.text('Tags'));
+        await pumpFrames(tester);
+
+        expect(find.text('Vidéo'), findsNothing);
+        expect(find.text('cuisine'), findsOneWidget);
+        expect(
+          find.widgetWithText(FloatingActionButton, 'Masquer la sélection'),
+          findsNothing,
+        );
+
+        await tester.tap(find.text('cuisine'));
+        await pumpFrames(tester);
+
+        List<String> hiddenNames;
+        var attempts = 0;
+        do {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          hiddenNames = await tagRepository.getHiddenTagNames();
+          attempts++;
+        } while (hiddenNames.isEmpty && attempts < 100);
+        expect(hiddenNames, ['cuisine']);
+
+        final bookmarks = await repository.getAllBookmarks();
+        expect(bookmarks.single.isHidden, isTrue);
       });
     },
   );

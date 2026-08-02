@@ -17,7 +17,8 @@ const TagEntitySchema = CollectionSchema(
   name: r'TagEntity',
   id: -1285872882773628843,
   properties: {
-    r'name': PropertySchema(id: 0, name: r'name', type: IsarType.string),
+    r'isHidden': PropertySchema(id: 0, name: r'isHidden', type: IsarType.bool),
+    r'name': PropertySchema(id: 1, name: r'name', type: IsarType.string),
   },
 
   estimateSize: _tagEntityEstimateSize,
@@ -65,7 +66,8 @@ void _tagEntitySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.name);
+  writer.writeBool(offsets[0], object.isHidden);
+  writer.writeString(offsets[1], object.name);
 }
 
 TagEntity _tagEntityDeserialize(
@@ -75,8 +77,9 @@ TagEntity _tagEntityDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = TagEntity();
+  object.isHidden = reader.readBool(offsets[0]);
   object.isarId = id;
-  object.name = reader.readString(offsets[0]);
+  object.name = reader.readString(offsets[1]);
   return object;
 }
 
@@ -88,6 +91,8 @@ P _tagEntityDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
+      return (reader.readBool(offset)) as P;
+    case 1:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -302,6 +307,16 @@ extension TagEntityQueryWhere
 
 extension TagEntityQueryFilter
     on QueryBuilder<TagEntity, TagEntity, QFilterCondition> {
+  QueryBuilder<TagEntity, TagEntity, QAfterFilterCondition> isHiddenEqualTo(
+    bool value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'isHidden', value: value),
+      );
+    });
+  }
+
   QueryBuilder<TagEntity, TagEntity, QAfterFilterCondition> isarIdEqualTo(
     Id value,
   ) {
@@ -515,6 +530,18 @@ extension TagEntityQueryLinks
     on QueryBuilder<TagEntity, TagEntity, QFilterCondition> {}
 
 extension TagEntityQuerySortBy on QueryBuilder<TagEntity, TagEntity, QSortBy> {
+  QueryBuilder<TagEntity, TagEntity, QAfterSortBy> sortByIsHidden() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TagEntity, TagEntity, QAfterSortBy> sortByIsHiddenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.desc);
+    });
+  }
+
   QueryBuilder<TagEntity, TagEntity, QAfterSortBy> sortByName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.asc);
@@ -530,6 +557,18 @@ extension TagEntityQuerySortBy on QueryBuilder<TagEntity, TagEntity, QSortBy> {
 
 extension TagEntityQuerySortThenBy
     on QueryBuilder<TagEntity, TagEntity, QSortThenBy> {
+  QueryBuilder<TagEntity, TagEntity, QAfterSortBy> thenByIsHidden() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TagEntity, TagEntity, QAfterSortBy> thenByIsHiddenDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isHidden', Sort.desc);
+    });
+  }
+
   QueryBuilder<TagEntity, TagEntity, QAfterSortBy> thenByIsarId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isarId', Sort.asc);
@@ -557,6 +596,12 @@ extension TagEntityQuerySortThenBy
 
 extension TagEntityQueryWhereDistinct
     on QueryBuilder<TagEntity, TagEntity, QDistinct> {
+  QueryBuilder<TagEntity, TagEntity, QDistinct> distinctByIsHidden() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isHidden');
+    });
+  }
+
   QueryBuilder<TagEntity, TagEntity, QDistinct> distinctByName({
     bool caseSensitive = true,
   }) {
@@ -571,6 +616,12 @@ extension TagEntityQueryProperty
   QueryBuilder<TagEntity, int, QQueryOperations> isarIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isarId');
+    });
+  }
+
+  QueryBuilder<TagEntity, bool, QQueryOperations> isHiddenProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isHidden');
     });
   }
 

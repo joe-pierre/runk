@@ -28,6 +28,9 @@ class _FakeTagRepository implements TagRepository {
   Future<List<String>> getManagedTagNames() async => const [];
 
   @override
+  Future<List<String>> getHiddenTagNames() async => const [];
+
+  @override
   Future<void> createTag(String name) => throw UnimplementedError();
 
   @override
@@ -39,6 +42,12 @@ class _FakeTagRepository implements TagRepository {
 
   @override
   Future<void> deleteTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> hideTag(String name) => throw UnimplementedError();
+
+  @override
+  Future<void> unhideTag(String name) => throw UnimplementedError();
 }
 
 VideoBookmark _bookmarkWithTags(List<String> tags) {
@@ -77,24 +86,23 @@ Future<void> _pumpTagInputField(
 }
 
 void main() {
-  testWidgets(
-    'affiche une suggestion dont le texte tapé est un préfixe',
-    (tester) async {
-      await _pumpTagInputField(
-        tester,
-        existingTags: const ['cuisine', 'dev'],
-        tags: const [],
-        onTagsChanged: (_) {},
-      );
-      await tester.pumpAndSettle();
+  testWidgets('affiche une suggestion dont le texte tapé est un préfixe', (
+    tester,
+  ) async {
+    await _pumpTagInputField(
+      tester,
+      existingTags: const ['cuisine', 'dev'],
+      tags: const [],
+      onTagsChanged: (_) {},
+    );
+    await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField), 'cui');
-      await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'cui');
+    await tester.pumpAndSettle();
 
-      expect(find.text('cuisine'), findsOneWidget);
-      expect(find.text('dev'), findsNothing);
-    },
-  );
+    expect(find.text('cuisine'), findsOneWidget);
+    expect(find.text('dev'), findsNothing);
+  });
 
   testWidgets(
     'un tap sur une suggestion ajoute le tag et vide le champ de saisie',
