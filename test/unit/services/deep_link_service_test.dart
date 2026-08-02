@@ -61,25 +61,25 @@ void main() {
           canLaunchUrl: (uri) async => true,
           launchUrl: (uri, {mode = LaunchMode.platformDefault}) async {
             launchedUris.add(uri);
-            return uri.scheme != 'twitter';
+            return uri.scheme != 'instagram';
           },
         );
 
         final opened = await service.openInSource(
-          'https://x.com/user/status/123',
-          VideoSource.twitter,
+          'https://www.instagram.com/p/abc123/',
+          VideoSource.instagram,
         );
 
         expect(opened, isTrue);
         expect(launchedUris, [
-          Uri.parse('twitter://status?id=123'),
-          Uri.parse('https://x.com/user/status/123'),
+          Uri.parse('instagram://www.instagram.com/p/abc123/'),
+          Uri.parse('https://www.instagram.com/p/abc123/'),
         ]);
       },
     );
 
     test(
-      'construit le schéma natif X/Twitter avec l\'id du statut, quel que soit l\'hôte',
+      'ouvre directement le lien https d\'origine pour X/Twitter, sans tenter de schéma natif intermédiaire, quel que soit l\'hôte',
       () async {
         for (final url in [
           'https://twitter.com/user/status/1234567890',
@@ -87,8 +87,12 @@ void main() {
           'https://mobile.twitter.com/user/status/1234567890',
         ]) {
           final launchedUris = <Uri>[];
+          final canLaunchCalls = <Uri>[];
           final service = DeepLinkService(
-            canLaunchUrl: (uri) async => true,
+            canLaunchUrl: (uri) async {
+              canLaunchCalls.add(uri);
+              return true;
+            },
             launchUrl: (uri, {mode = LaunchMode.platformDefault}) async {
               launchedUris.add(uri);
               return true;
@@ -98,7 +102,8 @@ void main() {
           final opened = await service.openInSource(url, VideoSource.twitter);
 
           expect(opened, isTrue);
-          expect(launchedUris, [Uri.parse('twitter://status?id=1234567890')]);
+          expect(canLaunchCalls, isEmpty);
+          expect(launchedUris, [Uri.parse(url)]);
         }
       },
     );
