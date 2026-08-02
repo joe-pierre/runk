@@ -106,37 +106,39 @@ class _AddBookmarkSheetState extends ConsumerState<AddBookmarkSheet> {
           ),
           data: (metadata) {
             _initializeTitleIfNeeded(metadata);
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _MetadataPreview(metadata: metadata),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Titre',
-                    border: OutlineInputBorder(),
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _MetadataPreview(metadata: metadata),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Titre',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TagInputField(
-                  tags: _tags,
-                  onTagsChanged: (tags) => setState(() => _tags = tags),
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _isSaving ? null : () => _save(metadata),
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check),
-                  label: const Text('Ajouter'),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TagInputField(
+                    tags: _tags,
+                    onTagsChanged: (tags) => setState(() => _tags = tags),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _isSaving ? null : () => _save(metadata),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check),
+                    label: const Text('Ajouter'),
+                  ),
+                ],
+              ),
             );
           },
         ),
