@@ -40,6 +40,7 @@ void main() {
       localDatasource: localDatasource,
       remoteDatasource: remoteDatasource,
       tagLocalDatasource: tagLocalDatasource,
+      getCurrentUserId: () => null,
     );
   });
 
@@ -133,6 +134,7 @@ void main() {
         localDatasource: localDatasource,
         remoteDatasource: slowRemote,
         tagLocalDatasource: tagLocalDatasource,
+        getCurrentUserId: () => null,
       );
       syncService = SyncService(
         repository: slowRepository,

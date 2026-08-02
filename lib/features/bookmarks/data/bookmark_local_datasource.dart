@@ -140,6 +140,31 @@ class BookmarkLocalDatasource {
         .findAll();
   }
 
+  /// Retourne les entités pas encore associées à un compte (`userId ==
+  /// null`), non supprimées localement — sert à la confirmation de
+  /// rattachement rétroactif affichée à la connexion (Tâche 28, voir
+  /// DECISIONS.md), et à `BookmarkRepository.linkLocalBookmarksToUser`.
+  Future<List<BookmarkEntity>> getAllWithoutUser() {
+    return _isar.bookmarkEntitys
+        .filter()
+        .userIdIsNull()
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .findAll();
+  }
+
+  /// Nombre d'entités que retournerait [getAllWithoutUser] — évite de
+  /// charger les entités complètes juste pour décider si la boîte de
+  /// confirmation de rattachement (Tâche 28) doit être affichée.
+  Future<int> countWithoutUser() {
+    return _isar.bookmarkEntitys
+        .filter()
+        .userIdIsNull()
+        .and()
+        .isDeletedLocallyEqualTo(false)
+        .count();
+  }
+
   /// Recherche full-text locale sur le titre ou les tags (voir SPEC.md
   /// section 11 — écran Recherche) : aucune requête réseau, la donnée locale
   /// est la seule source consultée. Insensible à la casse, résultats triés

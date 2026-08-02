@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/services/app_scaffold_key_provider.dart';
 import '../../bookmarks/presentation/bookmark_list_provider.dart';
 import '../../bookmarks/presentation/bookmark_tag_filter_provider.dart';
 import '../data/tag_repository_provider.dart';
@@ -32,6 +33,12 @@ class TagsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: 'Menu',
+          onPressed: () =>
+              ref.read(appScaffoldKeyProvider).currentState?.openDrawer(),
+        ),
         title: const Text('Tags'),
         actions: [
           IconButton(

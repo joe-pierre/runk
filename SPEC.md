@@ -124,7 +124,8 @@ lib/
 ├── main.dart
 ├── app/
 │   ├── router.dart
-│   └── app_shell.dart                               # bottom nav 3 onglets, voir section 11
+│   ├── app_shell.dart                               # bottom nav 3 onglets, voir section 11
+│   └── app_drawer.dart                              # sidebar auth, voir DECISIONS.md Tâche 28
 ├── features/
 │   ├── bookmarks/
 │   │   ├── data/
@@ -142,14 +143,28 @@ lib/
 │   │       └── bookmark_card.dart
 │   ├── tags/
 │   │   └── presentation/tags_screen.dart
-│   └── search/
-│       └── presentation/search_screen.dart
+│   ├── search/
+│   │   └── presentation/search_screen.dart
+│   └── auth/                                        # Tâche 28, voir DECISIONS.md
+│       ├── data/
+│       │   ├── auth_repository.dart                # point d'entrée unique vers
+│       │   │                                        # SupabaseService.client.auth
+│       │   └── auth_repository_provider.dart
+│       ├── domain/
+│       │   └── auth_failure.dart                   # exception métier dédiée, voir
+│       │                                            # DECISIONS.md Tâche 28
+│       └── presentation/
+│           ├── auth_form.dart
+│           └── link_local_bookmarks_prompt.dart
 └── core/
     ├── services/
     │   ├── share_intent_service.dart
     │   ├── clipboard_service.dart
     │   ├── deep_link_service.dart
     │   ├── supabase_service.dart
+    │   ├── app_scaffold_key_provider.dart           # voir DECISIONS.md Tâche 28 : ici plutôt
+    │   │                                             # que app/, pour ne pas faire dépendre
+    │   │                                             # les features/ de app/
     │   └── metadata/
     │       ├── metadata_service.dart
     │       ├── providers/

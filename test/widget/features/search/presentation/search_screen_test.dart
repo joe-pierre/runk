@@ -39,6 +39,7 @@ void main() {
       localDatasource: BookmarkLocalDatasource(isar),
       remoteDatasource: FakeBookmarkRemoteDatasource(),
       tagLocalDatasource: TagLocalDatasource(isar),
+      getCurrentUserId: () => null,
     );
   });
 
