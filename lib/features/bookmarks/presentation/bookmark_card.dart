@@ -178,6 +178,9 @@ class _BookmarkThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (bookmark.source == VideoSource.maps) {
+      return _mapsIcon(context);
+    }
     final thumbnailUrl = bookmark.thumbnailUrl;
     if (bookmark.isPartial || thumbnailUrl == null) {
       return _placeholder(context, icon: Icons.videocam_off_outlined);
@@ -195,12 +198,36 @@ class _BookmarkThumbnail extends StatelessWidget {
     );
   }
 
+  /// Icône fixe affichée pour un bookmark [VideoSource.maps] (Tâche 39), à
+  /// la place de toute tentative de miniature réseau.
+  ///
+  /// Visuellement distincte du [_placeholder] générique utilisé pour un
+  /// [VideoBookmark.isPartial] classique (`Icons.videocam_off_outlined`/
+  /// `Icons.broken_image_outlined` sur fond `thumbnailPalette` cyclique) :
+  /// fond `colorScheme.primary` fixe (jamais cyclique) et icône
+  /// `Icons.location_on`, pour signaler sans ambiguïté un choix délibéré —
+  /// jamais un échec de récupération de miniature (voir DECISIONS.md,
+  /// entrée "Tâche 39").
+  Widget _mapsIcon(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.location_on, color: colorScheme.onPrimary),
+    );
+  }
+
   /// Placeholder affiché si la miniature réseau est absente, non encore
   /// chargée avec succès, ou si [VideoBookmark.isPartial] est vrai — fond
   /// coloré assigné de façon déterministe (voir DECISIONS.md, Tâche 29) via
   /// `AppColorTokens.thumbnailPalette`, jamais aléatoire à chaque rebuild ni
   /// lié à [VideoSource]. Ne concerne jamais une vraie miniature réseau,
-  /// affichée par [CachedNetworkImage] ci-dessus.
+  /// affichée par [CachedNetworkImage] ci-dessus, ni un bookmark
+  /// [VideoSource.maps] (voir [_mapsIcon]).
   Widget _placeholder(BuildContext context, {required IconData icon}) {
     final tokens = _colorTokens(context);
     final palette = tokens.thumbnailPalette;
@@ -263,6 +290,7 @@ class _PlatformIcon extends StatelessWidget {
       case VideoSource.youtube:
       case VideoSource.tiktok:
       case VideoSource.website:
+      case VideoSource.maps:
       case VideoSource.unknown:
         return null;
     }
@@ -276,6 +304,8 @@ class _PlatformIcon extends StatelessWidget {
         return Icons.music_note;
       case VideoSource.website:
         return Icons.public;
+      case VideoSource.maps:
+        return Icons.location_on;
       case VideoSource.unknown:
         return Icons.link;
       case VideoSource.instagram:

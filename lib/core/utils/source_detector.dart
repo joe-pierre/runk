@@ -34,7 +34,30 @@ class SourceDetector {
     if (_matchesDomain(host, const ['threads.net'])) {
       return VideoSource.threads;
     }
+    if (_isMapsUrl(host, uri.path)) {
+      return VideoSource.maps;
+    }
     return VideoSource.unknown;
+  }
+
+  /// Vrai si [host]/[path] correspond à un lien de lieu ou d'itinéraire
+  /// Google Maps (Tâche 39).
+  ///
+  /// `maps.app.goo.gl` (lien court généré par le bouton "Partager" de l'app
+  /// mobile) et `goo.gl/maps` (ancien format court, toujours en circulation)
+  /// sont reconnus sur tout leur domaine. `google.com`/`www.google.com` en
+  /// revanche n'est reconnu **que** si le chemin commence par `/maps` — le
+  /// domaine `google.com` seul sert aussi à la recherche web classique
+  /// (`google.com/search?...`), qui doit rester `unknown` puis passer par
+  /// `GenericWebsiteProvider` (Tâche 38).
+  static bool _isMapsUrl(String host, String path) {
+    if (_matchesDomain(host, const ['maps.app.goo.gl'])) return true;
+    if (host == 'goo.gl' && path.startsWith('/maps')) return true;
+    if (_matchesDomain(host, const ['google.com']) &&
+        path.startsWith('/maps')) {
+      return true;
+    }
+    return false;
   }
 
   /// Vrai si [host] correspond exactement à l'un des [domains], ou à l'un de
