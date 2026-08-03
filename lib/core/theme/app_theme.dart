@@ -90,6 +90,11 @@ abstract final class AppTheme {
           side: BorderSide(color: tokens.cardBorder),
         ),
       ),
+      // Checkboxes rondes plutôt que carrées (Tâche 35, voir DECISIONS.md),
+      // pour toute l'app (carte de bookmark, case "Tout sélectionner",
+      // sélection de `AddToMyEyesOnlyScreen`) — réglé ici plutôt qu'en
+      // override local sur chaque `Checkbox`, pour un rendu uniforme garanti.
+      checkboxTheme: const CheckboxThemeData(shape: CircleBorder()),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,

@@ -145,7 +145,10 @@ void main() {
         await tester.tap(find.byIcon(Icons.checklist));
         await pumpFrames(tester);
 
-        expect(find.byType(Checkbox), findsNWidgets(2));
+        // 2 bookmarks + la case "Tout sélectionner" (Tâche 35, voir
+        // DECISIONS.md).
+        expect(find.byType(Checkbox), findsNWidgets(3));
+        expect(find.text('Tout sélectionner'), findsOneWidget);
         expect(find.byIcon(Icons.close), findsOneWidget);
         expect(find.text('Masquer'), findsNothing);
         expect(find.text('Ne plus masquer'), findsNothing);

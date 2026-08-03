@@ -79,7 +79,12 @@ AppColorTokens _colorTokens(BuildContext context) =>
 /// (voir `BulkSelectionToolbar`). Icône déclencheuse sur fond circulaire
 /// discret teinté via [AppColorTokens.tagBackground]/`.tagText` (Tâche 34,
 /// voir DECISIONS.md) — même traitement visuel actif/inactif, seule
-/// l'icône (`Icons.checklist`/`Icons.close`) change.
+/// l'icône (`Icons.checklist`/`Icons.close`) change. Une case "Tout
+/// sélectionner" (Tâche 35, voir DECISIONS.md) apparaît au-dessus de la
+/// liste tant que le mode est actif : elle porte uniquement sur la liste
+/// actuellement affichée (après filtre par tag ou recherche en cours,
+/// jamais l'ensemble des bookmarks en base), cochée si et seulement si
+/// cette liste entière est déjà sélectionnée.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -142,6 +147,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final bookmarksAsync = isSearching
         ? ref.watch(bookmarkSearchProvider(trimmedQuery))
         : ref.watch(bookmarkListProvider);
+
+    // Liste actuellement affichée à l'écran (après filtre par tag ou
+    // recherche en cours), une fois les données chargées — portée exacte de
+    // la case "Tout sélectionner" (Tâche 35, voir DECISIONS.md) : jamais
+    // l'ensemble des bookmarks en base au-delà de ce qui est déjà chargé.
+    // `null` tant que les données ne sont pas encore disponibles (chargement
+    // ou erreur) : la case reste alors masquée, faute de liste sur laquelle
+    // agir.
+    final currentBookmarks = bookmarksAsync.maybeWhen(
+      data: (results) =>
+          isSearching ? results : _visibleBookmarks(results, tagFilter),
+      orElse: () => null,
+    );
 
     return Scaffold(
       body: RefreshIndicator(
@@ -221,6 +239,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
               ),
+            if (selection.isSelectionModeActive && currentBookmarks != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: CheckboxListTile(
+                    value:
+                        currentBookmarks.isNotEmpty &&
+                        selection.selectedIds.length ==
+                            currentBookmarks.length,
+                    onChanged: (checked) => (checked ?? false)
+                        ? selectionNotifier.selectAll(
+                            currentBookmarks.map((b) => b.id).toList(),
+                          )
+                        : selectionNotifier.deselectAll(),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    title: const Text('Tout sélectionner'),
+                  ),
+                ),
+              ),
             bookmarksAsync.when(
               loading: () => const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
@@ -236,9 +274,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               data: (results) {
-                final bookmarks = isSearching
-                    ? results
-                    : _visibleBookmarks(results, tagFilter);
+                final bookmarks = currentBookmarks!;
                 if (bookmarks.isEmpty) {
                   return SliverFillRemaining(
                     child: Center(
