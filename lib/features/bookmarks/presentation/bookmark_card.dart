@@ -262,6 +262,7 @@ class _PlatformIcon extends StatelessWidget {
         return 'assets/icons/threads.svg';
       case VideoSource.youtube:
       case VideoSource.tiktok:
+      case VideoSource.website:
       case VideoSource.unknown:
         return null;
     }
@@ -273,6 +274,8 @@ class _PlatformIcon extends StatelessWidget {
         return Icons.smart_display_outlined;
       case VideoSource.tiktok:
         return Icons.music_note;
+      case VideoSource.website:
+        return Icons.public;
       case VideoSource.unknown:
         return Icons.link;
       case VideoSource.instagram:
