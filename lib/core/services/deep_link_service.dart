@@ -119,11 +119,14 @@ class DeepLinkService {
         return Uri.tryParse(rebuild('vnd.youtube'));
       case VideoSource.threads:
       case VideoSource.twitter:
+      case VideoSource.website:
       case VideoSource.unknown:
         // Threads : aucun schéma natif connu. X/Twitter : schéma
         // `twitter://` abandonné (Tâche 36, voir doc de classe) au profit
         // du repli direct vers le lien https, plus fiable via les Universal
-        // Links/App Links associées à x.com.
+        // Links/App Links associées à x.com. Site générique (Tâche 38) :
+        // aucun schéma natif possible par nature, un site web quelconque
+        // n'a pas d'app associée.
         return null;
     }
   }

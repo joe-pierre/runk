@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'providers/facebook_provider.dart';
 import 'providers/generic_fallback_provider.dart';
+import 'providers/generic_website_provider.dart';
 import 'providers/instagram_provider.dart';
 import 'providers/metadata_provider.dart';
 import 'providers/threads_provider.dart';
@@ -24,8 +25,10 @@ class MetadataService {
   /// Crée le service. [providers] par défaut : les 6 plateformes cibles de
   /// Runk (YouTube et TikTok depuis la Tâche 4, X/Instagram/Facebook/Threads
   /// ajoutés en Tâche 7 — seule cette liste a été étendue, voir SPEC.md
-  /// section 8). [fallbackProvider] et [timeout] sont injectables pour les
-  /// tests.
+  /// section 8), suivies de `GenericWebsiteProvider` (Tâche 38) en dernière
+  /// position — son `canHandle` accepte toute URL `http`/`https`, il ne doit
+  /// donc jamais être consulté avant les 6 providers spécifiques.
+  /// [fallbackProvider] et [timeout] sont injectables pour les tests.
   MetadataService({
     List<MetadataProvider>? providers,
     MetadataProvider? fallbackProvider,
@@ -38,6 +41,7 @@ class MetadataService {
              InstagramProvider(),
              FacebookProvider(),
              ThreadsProvider(),
+             GenericWebsiteProvider(),
            ],
        _fallbackProvider = fallbackProvider ?? GenericFallbackProvider(),
        _timeout = timeout;
