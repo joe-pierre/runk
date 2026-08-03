@@ -1155,3 +1155,17 @@ Index unique insensible à la casse pour rester cohérent avec la déduplication
 **Vérification :** `flutter analyze` propre (aucun avertissement). Aucun appareil physique/émulateur disponible dans cette session (même limitation que la quasi-totalité des tâches précédentes) — bascule visuelle du `Switch`/de la case à cocher non confirmée sur device, laissée à l'utilisateur.
 
 **Statut :** 🔵 Choix assumé — `lib/features/settings/presentation/theme_mode_selector.dart`.
+
+---
+
+## [CHOIX] Tâche 37 — Style du filtre `TagsScreen` aligné sur la recherche `HomeScreen`
+
+**Contexte :** Tâche 37, branche `feat/tags-filter-style`. Le champ de recherche de `HomeScreen` (Tâche 30) et le champ de filtre local de `TagsScreen` (Tâche 33) avaient chacun leur propre `InputDecoration` codée en dur — bordure arrondie/dense pour le premier, style par défaut du thème pour le second — malgré une intention visuelle identique.
+
+**Décision :** extraction du style de `home_screen.dart` (référence, déjà validée visuellement dans une tâche antérieure) vers une fonction pure `searchFieldDecoration({required String hint})`, nouveau fichier `lib/core/theme/app_input_decorations.dart`. Les deux écrans appellent désormais cette même fonction avec leur `hint` respectif. Alternative écartée : un widget dédié (`SearchTextField`) englobant le `TextField` — rejetée comme sur-ingénierie, les deux champs ont des `controller`/`onChanged` déjà propres à leur écran (recherche full-text vs filtre local par sous-chaîne, logiques volontairement non mutualisées, voir doc de `tags_screen.dart`) ; seule l'`InputDecoration` était dupliquée.
+
+**Aucune logique déplacée :** `bookmarkSearchProvider` (recherche) et la correspondance de sous-chaîne locale (filtre) restent strictement inchangés, dans leurs fichiers respectifs — `app_input_decorations.dart` ne contient qu'une fonction de style, sans import Riverpod.
+
+**Vérification :** `flutter analyze` propre. `flutter test test/widget/features/bookmarks/presentation/home_screen_test.dart test/widget/features/tags/presentation/tags_screen_test.dart` : 17 passed, 1 skipped (cas préexistant et sans rapport, voir entrée Tâche 10 et `BUGS_AND_ROADMAP.md`). Aucun appareil physique/émulateur disponible dans cette session (même limitation que la quasi-totalité des tâches précédentes) — alignement visuel exact non confirmé sur device, laissé à l'utilisateur.
+
+**Statut :** 🔵 Choix assumé — `lib/core/theme/app_input_decorations.dart` (nouveau), `lib/features/bookmarks/presentation/home_screen.dart`, `lib/features/tags/presentation/tags_screen.dart`.
