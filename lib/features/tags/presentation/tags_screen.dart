@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/app_scaffold_key_provider.dart';
+import '../../../core/theme/app_input_decorations.dart';
 import '../../bookmarks/presentation/bookmark_list_provider.dart';
 import '../../bookmarks/presentation/bookmark_tag_filter_provider.dart';
 import '../data/tag_repository_provider.dart';
@@ -81,10 +82,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _filterController,
-              decoration: const InputDecoration(
-                hintText: 'Filtrer les tags...',
-                prefixIcon: Icon(Icons.search),
-              ),
+              decoration: searchFieldDecoration(hint: 'Filtrer les tags...'),
             ),
           ),
           Expanded(

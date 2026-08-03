@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_scaffold_key_provider.dart';
 import '../../../core/theme/app_color_tokens.dart';
+import '../../../core/theme/app_input_decorations.dart';
 import '../domain/video_bookmark.dart';
 import 'bookmark_card.dart';
 import 'bookmark_context_menu.dart';
@@ -208,13 +209,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Rechercher par titre ou tag',
-                      prefixIcon: Icon(Icons.search),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(24)),
-                      ),
+                    decoration: searchFieldDecoration(
+                      hint: 'Rechercher par titre ou tag',
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
