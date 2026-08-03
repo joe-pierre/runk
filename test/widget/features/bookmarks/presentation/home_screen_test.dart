@@ -255,6 +255,62 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Tâche 35 : "Tout sélectionner" sélectionne la liste affichée et met à '
+    'jour "Supprimer (N)", puis la désélectionne au second tap',
+    (tester) async {
+      final first = VideoBookmark(
+        id: '1',
+        url: 'https://youtube.com/watch?v=abc',
+        title: 'Vidéo un',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      final second = VideoBookmark(
+        id: '2',
+        url: 'https://youtube.com/watch?v=xyz',
+        title: 'Vidéo deux',
+        source: VideoSource.youtube,
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bookmarkListProvider.overrideWith(
+              () => _FakeBookmarkList([first, second]),
+            ),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.checklist));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tout sélectionner'), findsOneWidget);
+      expect(find.text('Supprimer (0)'), findsNothing);
+
+      await tester.tap(find.text('Tout sélectionner'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Supprimer (2)'), findsOneWidget);
+
+      final selectAllCheckbox = tester.widget<CheckboxListTile>(
+        find.widgetWithText(CheckboxListTile, 'Tout sélectionner'),
+      );
+      expect(selectAllCheckbox.value, isTrue);
+
+      await tester.tap(find.text('Tout sélectionner'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Supprimer'), findsNothing);
+    },
+  );
+
   group('Recherche intégrée (Tâche 30, voir DECISIONS.md)', () {
     // Reprend le comportement de l'ancien `SearchScreen`, désormais absorbé
     // par HomeScreen : nécessite un Isar réel (pas `_FakeBookmarkList`) pour

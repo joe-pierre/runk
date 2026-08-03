@@ -80,4 +80,17 @@ class BookmarkSelectionController extends _$BookmarkSelectionController {
   void clearSelection() {
     state = state.copyWith(selectedIds: const {});
   }
+
+  /// Remplace la sélection courante par [ids] (case "Tout sélectionner",
+  /// Tâche 35, voir DECISIONS.md) — [ids] doit correspondre aux identifiants
+  /// de la liste actuellement affichée à l'écran, jamais à l'ensemble des
+  /// bookmarks en base. Ne désactive pas le mode sélection.
+  void selectAll(List<String> ids) {
+    state = state.copyWith(selectedIds: Set<String>.of(ids));
+  }
+
+  /// Vide la sélection courante — alias explicite de [clearSelection] côté
+  /// case "Tout sélectionner" (Tâche 35), qui bascule entre [selectAll] et
+  /// [deselectAll] selon l'état courant de la case.
+  void deselectAll() => clearSelection();
 }
