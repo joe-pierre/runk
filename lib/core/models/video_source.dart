@@ -21,5 +21,17 @@ enum VideoSource {
   /// assignée explicitement par `GenericWebsiteProvider` en cas de succès du
   /// scraping `og:` (voir DECISIONS.md, entrée "Tâche 38").
   website,
+
+  /// Lieu ou itinéraire Google Maps (Tâche 39).
+  ///
+  /// Aucune miniature n'est **jamais** récupérée pour cette source — décision
+  /// produit assumée, pas une dégradation : les pages Google Maps sont
+  /// fortement rendues en JavaScript côté client, sans `og:image`
+  /// exploitable de façon fiable par scraping, et l'API Static Maps
+  /// (payante, à clé) est volontairement écartée pour ce périmètre (voir
+  /// DECISIONS.md, entrée "Tâche 39"). `MapsProvider.fetchMetadata` ne
+  /// renseigne donc jamais `VideoMetadata.thumbnailUrl`, quel que soit le
+  /// succès de la récupération du titre.
+  maps,
   unknown,
 }
