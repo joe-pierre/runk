@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_scaffold_key_provider.dart';
+import '../../../core/theme/app_color_tokens.dart';
 import '../domain/video_bookmark.dart';
 import 'bookmark_card.dart';
 import 'bookmark_context_menu.dart';
@@ -18,6 +19,13 @@ import 'open_bookmark_action.dart';
 /// Sélection multiple de cet écran (Tâche 26, voir DECISIONS.md) — seule
 /// instance existante depuis la Tâche 30, voir [BookmarkSelectionScope].
 const _selectionScope = BookmarkSelectionScope.home;
+
+/// Tokens de couleur actifs, ou [AppColorTokens.dark] si aucun thème Runk
+/// n'est enregistré (mêmes raisons qu'en `bookmark_card.dart`) — utilisé
+/// pour teinter le fond circulaire de l'icône de sélection multiple (Tâche
+/// 34, voir DECISIONS.md).
+AppColorTokens _colorTokens(BuildContext context) =>
+    Theme.of(context).extension<AppColorTokens>() ?? AppColorTokens.dark;
 
 /// Écran d'accueil : liste chronologique (date de création décroissante) de
 /// tous les bookmarks non supprimés et non masqués (voir SPEC.md section
@@ -68,7 +76,10 @@ const _selectionScope = BookmarkSelectionScope.home;
 /// [_selectionScope]) ; une fois actif, chaque `BookmarkCard` affiche une
 /// case à cocher et `BulkSelectionToolbar` apparaît en bas dès qu'au moins
 /// un bookmark est coché. Aucune action de masquage n'y est jamais exposée
-/// (voir `BulkSelectionToolbar`).
+/// (voir `BulkSelectionToolbar`). Icône déclencheuse sur fond circulaire
+/// discret teinté via [AppColorTokens.tagBackground]/`.tagText` (Tâche 34,
+/// voir DECISIONS.md) — même traitement visuel actif/inactif, seule
+/// l'icône (`Icons.checklist`/`Icons.close`) change.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -151,16 +162,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: const Text('Runk'),
               ),
               actions: [
-                IconButton(
-                  icon: Icon(
-                    selection.isSelectionModeActive
-                        ? Icons.close
-                        : Icons.checklist,
+                Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _colorTokens(context).tagBackground,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        selection.isSelectionModeActive
+                            ? Icons.close
+                            : Icons.checklist,
+                        color: _colorTokens(context).tagText,
+                      ),
+                      tooltip: selection.isSelectionModeActive
+                          ? 'Annuler la sélection'
+                          : 'Sélectionner des bookmarks',
+                      onPressed: selectionNotifier.toggleSelectionMode,
+                    ),
                   ),
-                  tooltip: selection.isSelectionModeActive
-                      ? 'Annuler la sélection'
-                      : 'Sélectionner des bookmarks',
-                  onPressed: selectionNotifier.toggleSelectionMode,
                 ),
               ],
               bottom: PreferredSize(
