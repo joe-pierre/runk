@@ -7,6 +7,11 @@ import '../data/theme_mode_provider.dart';
 /// (Tâche 29, voir DECISIONS.md) — point d'entrée unique pour changer le
 /// thème actif à la volée, sans redémarrage de l'app.
 ///
+/// Présenté comme un [Switch] Clair/Sombre associé à une case à cocher
+/// séparée "Suivre le thème du système" (Tâche 36, voir DECISIONS.md) —
+/// remplace le `SegmentedButton` de la Tâche 29 sans changer la logique de
+/// [themeModeControllerProvider].
+///
 /// Affiché que l'utilisateur soit connecté ou non : le choix de thème n'a
 /// aucun lien avec l'authentification (voir `AppDrawer`).
 class ThemeModeSelector extends ConsumerWidget {
@@ -16,6 +21,15 @@ class ThemeModeSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeMode = ref.watch(themeModeControllerProvider);
+    final isFollowingSystem = activeMode == ThemeMode.system;
+    final systemPrefersDark =
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDarkSwitchPosition =
+        isFollowingSystem ? systemPrefersDark : activeMode == ThemeMode.dark;
+
+    void setThemeMode(ThemeMode mode) =>
+        ref.read(themeModeControllerProvider.notifier).setThemeMode(mode);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -23,29 +37,33 @@ class ThemeModeSelector extends ConsumerWidget {
         children: [
           Text('Thème', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
-          SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(
-                value: ThemeMode.light,
-                icon: Icon(Icons.light_mode_outlined),
-                label: Text('Clair'),
+          Row(
+            children: [
+              const Icon(Icons.light_mode_outlined),
+              Switch(
+                value: isDarkSwitchPosition,
+                onChanged: isFollowingSystem
+                    ? null
+                    : (isDark) =>
+                        setThemeMode(isDark ? ThemeMode.dark : ThemeMode.light),
               ),
-              ButtonSegment(
-                value: ThemeMode.dark,
-                icon: Icon(Icons.dark_mode_outlined),
-                label: Text('Sombre'),
-              ),
-              ButtonSegment(
-                value: ThemeMode.system,
-                icon: Icon(Icons.settings_suggest_outlined),
-                label: Text('Système'),
-              ),
+              const Icon(Icons.dark_mode_outlined),
             ],
-            selected: {activeMode},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) => ref
-                .read(themeModeControllerProvider.notifier)
-                .setThemeMode(selection.first),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('Suivre le thème du système'),
+            value: isFollowingSystem,
+            onChanged: (followSystem) {
+              if (followSystem == true) {
+                setThemeMode(ThemeMode.system);
+              } else {
+                setThemeMode(
+                  isDarkSwitchPosition ? ThemeMode.dark : ThemeMode.light,
+                );
+              }
+            },
           ),
         ],
       ),
